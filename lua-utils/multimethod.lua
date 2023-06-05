@@ -7,8 +7,8 @@ local array = require "lua-utils.array"
 local class = require "lua-utils.class"
 local types = require "lua-utils.types"
 local exception = require "lua-utils.exception"
-local validate = require "lua-utils.validate"
-local is_a = validate.is_a
+local param = require "lua-utils.param"
+local is_a = param.is_a
 local mt = {}
 local multimethod = setmetatable({}, mt)
 

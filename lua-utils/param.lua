@@ -1,5 +1,5 @@
 --- Type validation utilities
-local validate = {}
+local param = {}
 local Set = require "lua-utils.Set"
 local types = require "lua-utils.types"
 local dict = require "lua-utils.dict"
@@ -63,18 +63,18 @@ end
 -- @usage
 -- --- Indexing with spec is also supported
 -- -- true
--- validate.is_a.number(1)
--- validate.is_a(1, "number")
+-- param.is_a.number(1)
+-- param.is_a(1, "number")
 --
 -- -- true
--- validate.is_a.class(class "A")
--- validate.is_a(class "A", "A")
+-- param.is_a.class(class "A")
+-- param.is_a(class "A", "A")
 --
--- @function validate.is_a
+-- @function param.is_a
 -- @param param param to be checked
 -- @param spec type spec: string|class|any
 -- @treturn boolean
-validate.is_a = setmetatable({}, {
+param.is_a = setmetatable({}, {
   __call = function(_, param, spec) return is_a(param, spec) end,
   __index = function(_, spec)
     return function(param) return is_a(param, spec) end
@@ -84,7 +84,7 @@ validate.is_a = setmetatable({}, {
 --- Returns a callable that checks the type. To be used with .validate
 -- @param spec type specification
 -- @treturn callable
-function validate.is(spec)
+function param.is(spec)
   if types.typeof(spec) ~= "table" then spec = { spec } end
 
   return function(param)
@@ -195,7 +195,7 @@ end
 --
 -- -- Nested tables supported. They should not be classes
 -- -- b.c: expected string, got number
--- validate.validate {
+-- param.validate {
 --   dict = {
 --     {
 --       a = 'number',
@@ -214,11 +214,11 @@ end
 --
 -- --- Indexing is also supported
 -- -- error thrown
--- validate.validate.number('number', 'a')
+-- param.param.number('number', 'a')
 --
--- @function validate.validate
+-- @function param.validate
 -- @param spec_with_param type specs for params. See usage
-validate.validate = setmetatable({}, {
+param.validate = setmetatable({}, {
   __call = function(_, spec_with_param)
     dict.each(spec_with_param, function(key, value)
       local is_opt = str.match_any(key, "^opt_", "^%?")
@@ -255,11 +255,11 @@ validate.validate = setmetatable({}, {
   end,
 })
 
-function validate.union(...)
+function param.union(...)
   return is(...)
 end
 
-function validate.globalize()
+function param.globalize()
   for key, value in pairs(validate) do
     if key ~= 'globalize' then
       _G[key] = value
@@ -267,4 +267,4 @@ function validate.globalize()
   end
 end
 
-return validate
+return param
