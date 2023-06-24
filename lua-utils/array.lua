@@ -408,19 +408,21 @@ function array.compare(a, b, callback, no_state)
   end
 
   local function cache_get(x, y)
-    local id = hash(x, y)
+    return cache[hash(x, y)]
+  end
 
-    if not cache[id] then
-      cache[id] = true
-      unique_id = unique_id + 1
-    end
+  local function cache_set(x, y)
+    local id = hash(x, y)
+    if cache[id] then return end
+
+    cache[id] = true
+    unique_id = unique_id + 1
   end
 
   local function _compare(x, y)
     if cache_get(x, y) then return end
 
     local later = {}
-
     for key, value in pairs(x) do
       local y_value = y[key]
       if not y_value then
@@ -436,11 +438,13 @@ function array.compare(a, b, callback, no_state)
       end
 
       for _, v in ipairs(later) do
-        _compare(unpack(v))
+        local sub_x, sub_y = unpack(later)
+        _compare(sub_x, sub_y)
+        cache_set(sub_x, sub_y)
       end
 
       all_equal = state[key]
-      if no_state and not all_equal then return false end
+      if no_state and not all_equal then return end
     end
   end
 
@@ -729,14 +733,14 @@ function array.extract(x)
   return out
 end
 
-function array.deepcopy(x, new)
+function array.deepcopy(x, callback)
   if type(x) ~= "table" then return x end
 
   local cache = {}
-  new = new or {}
+  local new = new or {}
   local current = new
 
-  local function walk(tbl, current)
+  local function walk(tbl)
     if cache[tbl] then
       return
     else
@@ -744,18 +748,19 @@ function array.deepcopy(x, new)
     end
 
     dict.each(tbl, function(key, value)
-      if type(value) == "table" then
+      if type(value) == "table" and not cache[tbl] then
         current[key] = {}
         current = current[key]
-        array.deepcopy(value, current)
+        array.deepcopy(value)
+      elseif callback then
+        current[key] = callback(value)
       else
         current[key] = value
       end
-      pp(new)
     end)
   end
 
-  walk(x, current)
+  walk(x)
 
   return new
 end

@@ -20,3 +20,6 @@ makeglobal(utils)
 makeglobal(fn)
 makeglobal(pprint)
 makeglobal(param)
+
+deepcopy = array.deepcopy
+copy = array.copy
