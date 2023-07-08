@@ -1,12 +1,12 @@
 --- Type validation utilities
 local param = {}
-local Set = require "lua-utils.Set"
-local types = require "lua-utils.types"
-local dict = require "lua-utils.dict"
-local array = require "lua-utils.array"
-local str = require "lua-utils.str"
+local Set = require "Set"
+local types = require "types"
+local dict = require "dict"
+local array = require "array"
+local str = require "str"
 local valid_types = types.builtin
-local class = require "lua-utils.class"
+local class = require "class"
 
 --------------------------------------------------------------------------------
 local function is_a_message(expected, got)

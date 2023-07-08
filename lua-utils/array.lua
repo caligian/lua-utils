@@ -1,7 +1,7 @@
 --- Tables as arrays - utilties
 -- @module array
-local types = require "lua-utils.types"
-local utils = require "lua-utils.utils"
+local types = require "types"
+local utils = require "utils"
 local array = {}
 
 --------------------------------------------------------------------------------

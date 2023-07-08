@@ -2,7 +2,7 @@
 -- This module adds some much needed string manipulation utilities to lua.
 -- All the methods in this module are added to builtin string module
 -- @module str
-local utils = require "lua-utils.utils"
+local utils = require "utils"
 local str = {}
 
 --------------------------------------------------------------------------------

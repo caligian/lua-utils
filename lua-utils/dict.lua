@@ -1,8 +1,8 @@
 --- Tables as dictionaries
 -- @module dict
-local types = require "lua-utils.types"
-local utils = require "lua-utils.utils"
-local array = require "lua-utils.array"
+local types = require "types"
+local utils = require "utils"
+local array = require "array"
 
 --------------------------------------------------------------------------------
 local dict = {}

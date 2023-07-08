@@ -1,13 +1,13 @@
 --- Classes in lua
 -- @classmod class
-local dict = require "lua-utils.dict"
-local types = require "lua-utils.types"
-local utils = require "lua-utils.utils"
-local array = require "lua-utils.array"
+local dict = require "dict"
+local types = require "types"
+local utils = require "utils"
+local array = require "array"
+local module = require 'module'
 
 --------------------------------------------------------------------------------
-local mt = {}
-local class = setmetatable({}, mt)
+local class = module.new 'class'
 
 --------------------------------------------------------------------------------
 class.valid_mt_keys = {

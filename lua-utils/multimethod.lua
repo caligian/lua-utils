@@ -1,13 +1,13 @@
 --- Multimethod implementation
 -- @classmod multimethod
 -- @alias mt
-local utils = require "lua-utils.utils"
-local dict = require "lua-utils.dict"
-local array = require "lua-utils.array"
-local class = require "lua-utils.class"
-local types = require "lua-utils.types"
-local exception = require "lua-utils.exception"
-local param = require "lua-utils.param"
+local utils = require "utils"
+local dict = require "dict"
+local array = require "array"
+local class = require "class"
+local types = require "types"
+local exception = require "exception"
+local param = require "param"
 local is_a = param.is_a
 local mt = {}
 local multimethod = setmetatable({}, mt)

@@ -1,309 +1,233 @@
 --- dict-based Set objects
 -- @classmod Set
-local class = require "lua-utils.class"
-local array = require "lua-utils.array"
-local dict = require "lua-utils.dict"
-local utils = require "lua-utils.utils"
-local types = require "lua-utils.types"
-local Set = class "Set"
+
+local array = require "array"
+local dict = require "dict"
+local utils = require "utils"
+local types = require "types"
+local module = require "module"
+local struct = require "struct"
+local exception = require "exception"
+local set = module.new "set"
+
+set.Set = struct.new("Set", { "value" })
+local Set = set.Set
 
 --------------------------------------------------------------------------------
---- Constructor
--- @usage
--- local a = Set {1,2,3}
--- local b = Set {3,3}
--- @param t table|Set
--- @treturn self
-function Set:init(t)
-  assert(type(t) == "table", "table expected, got " .. type(t))
+function set.new(tbl)
+    tbl = tbl or {}
 
-  if types.is_class(t) then
-    local name = t:get_name()
-    if name ~= "Set" then
-      error("Set|table expected, got " .. name)
-      return self
-    else
-      t = t.value
+    if types.is_a(tbl, "Set") then
+        return tbl
+    elseif not types.is_table(tbl) or not types.is_array(tbl) then
+        return
     end
-  end
 
-  self.value = {}
-  for _, value in pairs(t) do
-    self.value[value] = value
-  end
+    local st = Set {}
+    st.value = array.todict(tbl)
 
-  return self
+    function st.__eq(obj, other) return Set.equals(obj, other) end
+    function st.__ne(obj, other) return not Set.equals(obj, other) end
+    function st.__sub(obj, other) return Set.difference(obj, other) end
+    function st.__add(obj, other) return Set.union(obj, other) end
+    function st.__pow(obj, other) return Set.intersection(obj, other) end
+
+    return st
 end
 
---- Set has value x?
+--- M has value x?
 -- @param x value
 -- @treturn any
-function Set:has(x)
-  return self.value[x]
-end
+function Set.has(obj, x) return obj.value[x] end
 
 --- Add value to set
 -- @param x value
-function Set:add(x)
-  self.value[x] = x
+function Set.add(obj, x)
+    obj.value[x] = x
+
+    return x
 end
 
 --- Get all elements
 -- @param cmp optional callable to sort
 -- @treturn array
-function Set:items(cmp)
-  cmp = cmp or function(x, y)
-    return tostring(x) < tostring(y)
-  end
-  local X = dict.values(self.value)
-  table.sort(X, cmp)
+function Set.items(obj, cmp)
+    cmp = cmp or function(x, y) return tostring(x) < tostring(y) end
 
-  return X
+    local X = dict.values(obj.value)
+    table.sort(X, cmp)
+
+    return X
 end
 
 --- Apply a function to all set elements
 -- @param f callable to apply
-function Set:each(f)
-  array.each(self:items(), f)
-end
+function Set.each(obj, f) array.each(Set.items(obj), f) end
 
 --- Apply a function to all set elements
 -- @param f callable to apply
 -- @treturn array of transformed elements
-function Set:map(f)
-  return array.map(self:items(), f)
-end
+function Set.map(obj, f) return array.map(Set.items(obj), f) end
 
 --- Grep elements by callable
 -- @param f callable criterion
 -- @treturn array of matched elements
-function Set:grep(f)
-  return array.grep(self:items(), f)
-end
+function Set.grep(obj, f) return array.grep(Set.items(obj), f) end
 
 --- Filter elements by callable
 -- @param f callable criterion
 -- @treturn boolean array of elements
-function Set:filter(f)
-  return array.filter(self:items(), f)
-end
+function Set.filter(obj, f) return array.filter(Set.items(obj), f) end
 
 --- Get set length
 -- @treturn set length
-function Set:len()
-  return dict.len(self.value)
-end
+function Set.len(obj) return dict.len(obj.value) end
 
 --- Get set length
 -- @treturn set length
-function Set:length()
-  return dict.len(self.value)
-end
+function Set.length(obj) return dict.len(obj.value) end
 
---- Set intersection
--- @param ... rest of Sets/arrays to intersect with this set
--- @treturn Set
-function Set:intersection(...)
-  local out = Set {}
+--- M intersection
+-- @param ... rest of Ms/arrays to intersect with this set
+-- @treturn M
+function Set.intersection(obj, ...)
+    local out = set.new {}
 
-  for _, Y in ipairs { ... } do
-    Y = Set(Y)
+    for _, Y in ipairs { ... } do
+        Y = set.new(Y)
 
-    self:each(function(x)
-      if Y:has(x) then
-        out:add(x)
-      end
-    end)
+        Set.each(obj, function(x)
+            if Set.has(Y, x) then Set.add(out, x) end
+        end)
 
-    Y:each(function(y)
-      if self:has(y) then
-        out:add(y)
-      end
-    end)
-  end
+        Set.each(Y, function(y)
+            if Set.has(obj, y) then Set.add(out, y) end
+        end)
+    end
 
-  return out
+    return out
 end
 
 --- Are sets disjoint?
--- @param y other Set|table
+-- @param y other M|table
 -- @treturn boolean
-function Set:is_disjoint(y)
-  return self:intersection(y):len() == 0
-end
+function Set.is_disjoint(obj, y) return Set.len(Set.intersection(obj, y)) == 0 end
 
 --- Get the complement of current set with others sets
--- @param ... other Sets|tables
--- @treturn Set
-function Set:complement(...)
-  local out = Set.new {}
-  local Z = self:intersection(...)
+-- @param ... other Ms|tables
+-- @treturn M
+function Set.complement(obj, ...)
+    local out = set.new {}
+    local Z = Set.intersection(obj, ...)
 
-  self:each(function(x)
-    if not Z:has(x) then
-      out:add(x)
-    end
-  end)
+    Set.each(obj, function(x)
+        if not Set.has(Z, x) then Set.add(out, x) end
+    end)
 
-  return out
+    return out
 end
 
 --- Get a union of all sets
 -- @usage
--- local a = Set {'a', 'b'}
--- local b = Set {'c', 'd'}
+-- local a = M {'a', 'b'}
+-- local b = M {'c', 'd'}
 -- local c = a + b
--- local d = a + b + Set {'e', 'f'}
--- local e = a:union(b, c, d)
--- @param ... Sets|tables to use with current set
--- @treturn Set
-function Set:union(...)
-  local out = Set.new {}
+-- local d = a + b + M {'e', 'f'}
+-- local e = Set.union(a, b, c, d)
+-- @param ... Ms|tables to use with current set
+-- @treturn M
+function Set.union(obj, ...)
+    local out = set.new {}
 
-  for _, Y in ipairs { ... } do
-    Y = Set.new(Y)
+    for _, Y in ipairs { ... } do
+        Y = set.new(Y)
 
-    self:each(function(x)
-      out:add(x)
-    end)
+        Set.each(obj, function(x) Set.add(out, x) end)
 
-    Y:each(function(y)
-      out:add(y)
-    end)
-  end
+        Set.each(Y, function(y) Set.add(out, y) end)
+    end
 
-  return out
+    return out
 end
 
 --- Get set difference with current set
 -- @usage
--- local a = Set {1,2,3}
--- local b = Set {3,4,5,6}
--- local c = Set {1, 2}
+-- local a = M {1,2,3}
+-- local b = M {3,4,5,6}
+-- local c = M {1, 2}
 -- print(a - b - c)
--- print(a:difference(b, c))
+-- print(Set.difference(a, b, c))
 -- @param ... other sets
--- @treturn Set
-function Set:difference(...)
-  local out = Set.new {}
+-- @treturn M
+function Set.difference(obj, ...)
+    local out = set.new {}
 
-  for _, Y in ipairs { ... } do
-    Y = Set.new(Y)
-    self:each(function(x)
-      if not Y:has(x) then
-        out:add(x)
-      end
-    end)
-  end
+    for _, Y in ipairs { ... } do
+        Y = set.new(Y)
 
-  return out
+        Set.each(obj, function(x)
+            if not Set.has(Y, x) then Set.add(out, x) end
+        end)
+    end
+
+    return out
 end
 
---- Is this set equal to another Set|table?
--- @param other Set|table to compare
+--- Is this set equal to another M|table?
+-- @param other M|table to compare
 -- @treturn boolean
-function Set:equals(other)
-  if not types.is_table(other) then
-    return
-  end
+function Set.equals(obj, other)
+    if not types.is_table(other) then return end
 
-  return array.compare(dict.values(self.value), dict.values(other), nil, true)
+    return array.compare(dict.values(obj.value), dict.values(other), nil, true)
 end
 
---- Is this set not equal to another Set|table?
--- @param other Set|table to compare
+--- Is this set not equal to another M|table?
+-- @param other M|table to compare
 -- @treturn boolean
-function Set:not_equals(other)
-  return not self:equals(other)
-end
+function Set.not_equals(obj, other) return not Set.equals(obj, other) end
 
---- Compare elements of two sets
--- @usage
--- Set({2, 3, 4}) == Set({3, 4, 2}) -- true
--- @param other other set
--- @treturn boolean
-function Set:__eq(other)
-  return self:equals(other)
-end
-
---- Compare elements of two sets with not logic
--- @usage
--- Set({2, 3, 4}) ~= Set({3, 4, 2}) -- true
--- @param other other Set|table
--- @treturn boolean
-function Set:__ne(other)
-  return not self:equals(other)
-end
-
---- Get set difference
--- @usage
--- Set({'a', 'b'}) - Set({'b', 'c'}) -- Set({'a'})
--- @param other Set|table
--- @treturn Set
-function Set:__sub(other)
-  return self:difference(other)
-end
-
---- Get set union
--- @usage
--- Set({'a', 'b'}) + Set({'b', 'c'}) -- Set({'a', 'b', 'c'})
--- @param other Set|table
--- @treturn Set
-function Set:__add(other)
-  return self:union(other)
-end
-
---- Get set intersection
--- @usage
--- Set({'a', 'b'}) ^ Set({'b', 'c'}) -- Set({'a'})
--- @param other Set|table
--- @treturn Set
-function Set:__pow(other)
-  return self:intersection(other)
-end
+-- M({'a', 'b'}) ^ M({'b', 'c'}) -- M({'a'})
+-- @param other M|table
+-- @treturn M
 
 --- Is this set a subset of other set?
--- @param other other Set|table
+-- @param other other M|table
 -- @treturn boolean
-function Set:is_subset(other)
-  return self:difference(other):len() == 0
+function Set.is_subset(obj, other)
+    return Set.len(Set.difference(obj, other)) == 0
 end
 
 --- Is this set a superset of other set?
--- @param other other Set|table
+-- @param other other M|table
 -- @treturn boolean
-function Set:is_superset(other)
-  return other:difference(self):len() == 0
+function Set.is_superset(obj, other)
+    return Set.len(Set.difference(other, obj)) == 0
 end
 
 --- Remove element from set
 -- @treturn ?element
-function Set:remove(element)
-  local has = self.value[element]
-  if has then
-    self.value[element] = nil
-    return utils.copy(has)
-  end
+function Set.remove(obj, element)
+    local has = obj.value[element]
+    if has then
+        obj.value[element] = nil
+        return utils.copy(has)
+    end
 end
 
 --- Iterate over elements of a set
 -- @treturn callable
-function Set:iter()
-  local ks = array.sort(dict.keys(self.value))
-  local index = 1
+function Set.iter(obj)
+    local ks = array.sort(dict.keys(obj.value))
+    local index = 1
 
-  return function(idx)
-    local value = self.value[ks[idx or index]]
-    index = index + 1
-    return value
-  end
+    return function(idx)
+        local value = obj.value[ks[idx or index]]
+        index = index + 1
+        return value
+    end
 end
 
---- Is x a Set?
--- @param x object
--- @treturn boolean
-function Set.is_a(x)
-  return class.get_name(x) == "Set"
-end
+return set
 
-return Set
+

@@ -1,10 +1,14 @@
 --- Type checking utilities
 -- Lua has 7 (excluding nil) distinct types. We add 'class' and 'callable' to that list.
--- Tables and classes will be distinguished and treated accordingly similar to Ruby, Python, etc
 -- However these types will be accessible only via .typeof
 -- @module types
-local types = {}
-local utils = require "lua-utils.utils"
+-- local module = require 'lua-utils.module'
+-- local types = module.new 'types'
+-- local utils = require "utils"
+
+local module = require 'module'
+types = module.new 'types'
+local utils = require "utils"
 
 --- Lua builtin types
 -- @table types.builtin
@@ -16,8 +20,9 @@ types.builtin = {
   thread = true,
   ["function"] = true,
   callable = true,
-  class = true,
   boolean = true,
+  struct = true,
+  exception = true,
 }
 
 --- Is x a number?
@@ -63,6 +68,19 @@ function types.is_function(x)
   return type(x) == "function"
 end
 
+function types.is_callable(x)
+    if type(x) == 'function' then
+        return true
+    elseif type(x) ~= 'table' then
+        return false
+    end
+
+    local mt = getmetatable(x)
+    if not mt then return false end
+
+    return mt.__call or false
+end
+
 --- Is x nil
 -- @tparam any x
 -- @treturn boolean
@@ -70,108 +88,199 @@ function types.is_nil(x)
   return x == nil
 end
 
---- Is x a class?
--- @treturn boolean
-function types.is_class(x)
-  if type(x) ~= "table" then
-    return false
-  end
-
-  local mt = utils.mtget(x)
-  if not mt then
-    return false
-  elseif mt.type == "class" then
-    return x
-  else
-    return types.is_class(mt)
-  end
-end
-
 --- Is x a table (array|dict)?
 -- @tparam any x
 -- @treturn boolean
 function types.is_table(x)
-  return type(x) == "table" and not types.is_class(x)
+  return type(x) == "table" 
 end
 
---- Is x a class instance?
--- @tparam any x
--- @treturn boolean
-function types.is_instance(x)
-  return types.is_class(utils.mtget(x))
-end
-
---- Is x a callable (table with __call metamethod or function)?
--- @tparam any x
--- @treturn boolean
-function types.is_callable(x)
-  if types.is_function(x) then
-    return true
-  end
-  if not types.is_table(x) then
-    return false
-  end
-  local mt = getmetatable(x) or {}
-  return types.is_function(mt.__call)
-end
-
---- Get type name of a table
--- @tparam any x
--- @treturn ?string
-function types.get_type(x)
-  if types.is_class(x) then
-    return "class"
-  elseif types.is_table(x) then
-    if types.is_callable(x) then
-      return "callable"
-    else
-      return "table"
+function types.get_type_name(x)
+    if not types.is_table(x) then
+        return
     end
-  elseif types.is_function(x) then
-    return "callable"
-  else
-    return type(x)
-  end
+
+    local mt = getmetatable(x)
+    if not mt then return end
+
+    return mt.name
 end
 
---- Get type name of a table
--- @tparam any x
--- @treturn ?string
+function types.get_type(x)
+    if not types.is_table(x) then
+        return
+    end
+
+    local mt = getmetatable(x)
+    if not mt then return end
+
+    if mt.array then
+        return 'array'
+    elseif mt.dict then
+        return 'dict'
+    elseif mt.type then
+        return mt.type, mt.name
+    end
+end
+
 function types.typeof(x)
-  return types.get_type(x)
+    local tp = type(x)
+
+    if not tp then
+        return false
+    elseif tp ~= 'table' then
+        return tp
+    else
+        local tp, name = types.get_type(x)
+
+        if not tp then
+            return 'table', name
+        end
+
+        return tp, name
+    end
 end
 
---- Is x a class?
--- @tparam class x
--- @treturn ?class
-function types.get_class(x)
-  if types.is_instance(x) then
-    return utils.mtget(x)
-  elseif types.is_class(x) then
-    return x
-  end
+function types.is_struct(x)
+    return types.get_type(x) == 'struct'
 end
 
--- Get object name
--- @tparam any x
--- @treturn ?string
-function types.get_name(x)
-  local cls = types.get_class(x)
-  return cls and utils.mtget(cls, "name")
+function types.is_module(x)
+    return types.get_type(x) == 'module'
 end
 
-types.isnumber = types.is_number
-types.istable = types.is_table
-types.isnil = types.is_nil
-types.isthread = types.is_thread
-types.isboolean = types.is_boolean
-types.iscallable = types.is_callable
-types.isuserdata = types.is_userdata
-types.isstring = types.is_string
-types.isfunction = types.is_function
-types.isclass = types.is_class
-types.getname = types.get_name
-types.getclass = types.get_class
-types.gettype = types.get_type
+function types.is_exception(x)
+    return types.get_type(x) == 'module'
+end
+
+function types.is_array(x)
+    if not types.is_table(x) then
+        return false
+    elseif types.get_type(x) or types.is_callable(x) then
+        return false
+    end
+
+    local mt = getmetatable(x) or {}
+    if mt.array then return true end
+
+    for k, v in pairs(x) do
+        if not tostring(k):match('^[0-9]+$') then
+            return false
+        end
+    end
+
+    mt.array = true
+
+    return setmetatable(x, mt)
+end
+
+function types.is_dict(x)
+    if not types.is_table(x) then
+        return false
+    elseif types.get_type(x) or types.is_callable(x) then
+        return false
+    end
+
+    local mt = getmetatable(x) or {}
+    if mt.dict then return true end
+
+    for k, v in pairs(x) do
+        if tostring(k):match('^[0-9]+$') then
+            break
+        end
+    end
+
+    mt.dict = true
+
+    return setmetatable(x, mt)
+end
+
+function types.union(...)
+    local args = {...}
+
+    for i = 1, #args do
+        if args[i] == '*' then
+            return true
+        elseif not types.is_string(args[i]) then
+            args[i] = types.typeof(args[i])
+        end
+    end
+
+    local err_string = 'expected types: {' .. table.concat(args, ' ') .. '}, got '
+
+    return function (x)
+        local tp = types.typeof(x)
+        err_string = err_string .. tp
+
+        for i=1, #args do
+            if tp == args[i] then
+                return true
+            end
+        end
+
+        return false, err_string
+    end
+end
+
+function types.is_a(x, tp, assert_type)
+    local x_tp, x_tp_name = types.typeof(x)
+
+    if types.is_callable(tp) then
+        local ok, msg = tp(x)
+
+        if not ok then 
+            if assert_type then error(msg) end
+            return false, msg 
+        end
+
+        return true
+    elseif types.is_array(tp) then
+        return types.is_a(x, types.union(unpack(tp)), assert_type)
+    elseif types.is_string(tp) then
+        if tp:match '^[A-Z]' then
+            local ok = x_tp_name == tp
+            local msg = 'expected ' .. tp .. ', got ' .. (x_tp_name or x_tp)
+
+            if ok then
+                return true
+            elseif assert_type and not ok then
+                error(msg)
+            end
+
+            return false, msg
+        end
+
+        local ok = x_tp == tp
+        local msg = 'expected ' .. tp .. ', got ' .. x_tp
+
+        if ok then
+            return true
+        elseif assert_type and not ok then
+            error(msg)
+        end
+
+        return false, msg
+    else
+        tp = types.typeof(tp)
+        local ok = x_tp == tp
+        local msg = 'expected ' .. tp .. ', got ' .. x_tp
+
+        if ok then
+            return true
+        elseif assert_type and not ok then
+            error(msg)
+        end
+
+        return false, msg
+    end
+end
+
+function types.is(...)
+    return types.union(...)
+end
+
+function types.assert_type(x, tp)
+    return types.is_a(x, tp, true)
+end
 
 return types
