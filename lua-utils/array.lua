@@ -80,7 +80,7 @@ end
 --- Is array blank?
 -- @param x array
 -- @treturn boolean
-function array.isblank(x) return #x == 0 end
+function array.is_empty(x) return #x == 0 end
 
 --- Append elements to array. Modifies the array
 -- @tparam array x
@@ -124,22 +124,16 @@ end
 -- @tparam non-table x that is not a table
 -- @tparam boolean force listify the element?
 -- @treturn array
-function array.tolist(x, force)
+function array.to_array(x, force)
   if force or type(x) ~= "table" then return { x } end
 
   return x
 end
 
---- Convert an element into an array
--- @tparam any x that is not a table
--- @tparam boolean force listify the element?
--- @treturn array
-function array.toarray(x, force) return array.tolist(x, force) end
-
 --- Convert array values to keys
 -- @tparam array x
 -- @treturn dict
-function array.todict(x)
+function array.to_dict(x)
   if type(x) ~= "table" then return { [x] = x } end
 
   local out = {}
@@ -541,7 +535,7 @@ end
 -- @treturn any
 -- @treturn array
 function array.update(tbl, keys, value)
-  keys = array.tolist(keys)
+  keys = array.to_array(keys)
   local len_ks = #keys
   local t = tbl
   local i = 1
@@ -763,6 +757,10 @@ function array.deepcopy(x, callback)
   walk(x)
 
   return new
+end
+
+function array.is_array(x)
+    return types.is_array(x)
 end
 
 return array

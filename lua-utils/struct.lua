@@ -48,8 +48,6 @@ function struct.is_struct(st)
     return utils.mtget(st, "name")
 end
 
-function struct.name(st) return struct.is_struct(st) end
-
 function struct.equals(st1, st2, opts)
     assert(struct.is_struct(st1), "invalid_struct1")
     assert(struct.is_struct(st2), "invalid_struct2")
@@ -59,7 +57,6 @@ function struct.equals(st1, st2, opts)
     local callback = opts.callback
 
     if not struct.is_struct(st1) then return false end
-
     if not struct.is_struct(st2) then return false end
 
     local ks1 = dict.keys(st1)
@@ -90,16 +87,136 @@ end
 
 function struct.not_equals(...) return not struct.equals(...) end
 
+function struct.get_method(ctor, name, static)
+    assert(struct.is_struct(ctor), "expected struct")
+
+    types.assert_type(ctor, "struct")
+
+    if static then
+        local methods = utils.mtget(ctor, "static_methods")
+        return methods[name]
+    end
+
+    local methods = utils.mtget(ctor, "instance_methods")
+    return methods[name]
+end
+
+function struct.get_methods(ctor, static)
+    if static then return utils.mtget(ctor, "static_methods") end
+
+    return utils.mtget(ctor, "instance_methods")
+end
+
+function struct.name(x) return utils.mtget(x, "name") end
+
+function struct.add_method(ctor, name, callback, static)
+    local inst_methods = struct.get_methods(ctor)
+    local static_methods = struct.get_methods(ctor, true)
+
+    if static then
+        static_methods[name] = callback
+    else
+        inst_methods[name] = callback
+    end
+
+    local inst_exists = inst_methods[name]
+    local static_exists = static_methods[name]
+
+    local function method(st, ...)
+        if types.get_type_name(st) == struct.name(ctor) and inst_exists then
+            return inst_exists(st, ...)
+        elseif static_exists then
+            return static_exists(st, ...)
+        end
+    end
+
+    rawset(ctor, name, method)
+end
+
 function struct.new(name, valid_attribs)
-    if not valid_attribs then error "no_valid_attribs" end
+    if not valid_attribs then error "no valid attribs passed" end
 
-    valid_attribs = array.todict(valid_attribs)
+    for i = 1, #valid_attribs do
+        valid_attribs[valid_attribs[i]] = i
+    end
 
-    local mt = {
-        name = name,
-        type = "struct",
+    return setmetatable({
+        init = function(obj) return obj end,
         valid_attribs = valid_attribs,
+    }, {
+        type = "module",
+        name = name,
+        instance_methods = {},
+        static_methods = {},
+        __call = function(self, ...)
+            local mt = {
+                name = name,
+                type = "struct",
+                valid_attribs = valid_attribs,
+            }
+
+            local attribs = { ... }
+            local n = #attribs
+            local obj = {}
+
+            if types.get_type_name(attribs[1]) == name then
+                return attribs[1]
+            end
+
+            local args = {}
+
+            local is_dict = types.is_dict(attribs[1])
+                and n == 1
+                and #array.grep(
+                        dict.keys(attribs[1]),
+                        function(x) return x:match "^[0-9]+$" end
+                    )
+                    == 0
+
+            if is_dict then
+                dict.each(attribs[1], function(key, value)
+                    local i = mt.valid_attribs[key]
+                    struct.exception.invalid_attribute:assert(i, key)
+                    args[i] = value
+                    obj[key] = value
+                end)
+            else
+                for i = 1, #attribs do
+                    local key = valid_attribs[i]
+
+                    if not key then
+                        error("undefined attribute passed " .. dump(key))
+                    end
+
+                    obj[key] = attribs[i]
+                    args[i] = attribs[i]
+                end
+            end
+
+            local n = #valid_attribs
+            local m = #args
+            if n ~= m then error("expected " .. n .. " args, got " .. m) end
+
+            obj = setmetatable(obj, mt)
+
+            if self.init then return self.init(obj, unpack(args)) end
+
+            return attribs
+        end,
         __newindex = function(self, key, value)
+            if types.is_callable(value) then
+                if key:match "^static_" then
+                    struct.add_method(
+                        self,
+                        key:gsub("^static_", ""),
+                        value,
+                        true
+                    )
+                else
+                    struct.add_method(self, key, value)
+                end
+            end
+
             if valid_mt_ks[key] then return utils.mtset(self, key, value) end
 
             struct.exception.invalid_attribute:assert(key)
@@ -107,63 +224,18 @@ function struct.new(name, valid_attribs)
 
             return value
         end,
-    }
-
-    return setmetatable({}, {
-        __call = function(self, attribs)
-            attribs = array.copy(attribs or {})
-
-            dict.each(
-                attribs,
-                function(key, value)
-                    struct.exception.invalid_attribute:assert(
-                        mt.valid_attribs[key],
-                        key
-                    )
-                end
-            )
-
-            return setmetatable(attribs, mt)
-        end,
-        __newindex = function (self, key, value)
-            if types.is_function(value) then
-                rawset(self, key, function (st, ...)
-                    local tp, tp_name = types.typeof(st)
-                    if tp ~= 'struct' or tp_name ~= name then
-                        error('expected ' .. name .. ', got ' .. (tp_name or type(st)))
-                    end
-
-                    return value(st, ...)
-                end)
-            else
-                rawset(self, key, value)
-            end
-        end
     })
 end
 
-function struct.include(dst, src, opts)
-    assert(struct.is_struct(dst), "invalid_dst_struct")
-    assert(struct.is_struct(src), "invalid_src_struct")
+local Vector = struct.new("Vector", { "x", "y" })
 
-    opts = opts or {}
-    local overwrite = opts.overwrite
-    local missing = opts.missing
+function Vector.say(x) print "lkj" end
 
-    if overwrite == nil then overwrite = true end
-    if missing == nil then missing = true end
+function Vector.static_say() print(1, 2, 3) end
 
-    dict.each(src, function(key, value)
-        if not dst[key] then
-            if missing then dst[key] = value end
-        elseif overwrite then
-            dst[key] = value
-        end
-    end)
-
-    return dst
-end
-
-types.is_struct = struct.is_struct
+local x = Vector(1, 2)
+pp(x)
 
 return struct
+
+

@@ -9,6 +9,7 @@
 local module = require 'module'
 types = module.new 'types'
 local utils = require "utils"
+local pprint = require 'pprint'
 
 --- Lua builtin types
 -- @table types.builtin
@@ -186,7 +187,7 @@ function types.is_dict(x)
 
     for k, v in pairs(x) do
         if tostring(k):match('^[0-9]+$') then
-            break
+            return false
         end
     end
 
@@ -224,8 +225,26 @@ end
 
 function types.is_a(x, tp, assert_type)
     local x_tp, x_tp_name = types.typeof(x)
+    if not x_tp and x_tp_name then error('invalid object ' .. pprint.dump(x)) end
 
-    if types.is_callable(tp) then
+    local tp_tp, tp_name = types.typeof(tp)
+    if not tp_tp and tp_tp_name then error('invalid object ' .. pprint.dump(x)) end
+
+    local x_display
+    local tp_display
+    if x_tp_name then
+        x_display = string.format('%s (%s)', x_tp_name or '', x_tp)
+    else
+        x_display = string.format('%s', x_tp)
+    end
+
+    if tp_name then
+        tp_display = string.format('%s (%s)', tp_name or '', tp_tp)
+    else
+        tp_display = string.format('%s', tp_tp)
+    end
+
+    if tp_tp == 'callable' then
         local ok, msg = tp(x)
 
         if not ok then 
@@ -234,12 +253,12 @@ function types.is_a(x, tp, assert_type)
         end
 
         return true
-    elseif types.is_array(tp) then
+    elseif tp_tp == 'array' then
         return types.is_a(x, types.union(unpack(tp)), assert_type)
-    elseif types.is_string(tp) then
+    elseif tp_tp == 'string' then
         if tp:match '^[A-Z]' then
             local ok = x_tp_name == tp
-            local msg = 'expected ' .. tp .. ', got ' .. (x_tp_name or x_tp)
+            local msg = 'expected ' .. tp_display .. ', got ' .. x_display 
 
             if ok then
                 return true
@@ -251,7 +270,7 @@ function types.is_a(x, tp, assert_type)
         end
 
         local ok = x_tp == tp
-        local msg = 'expected ' .. tp .. ', got ' .. x_tp
+        local msg = 'expected ' .. tp_display .. ', got ' .. x_display
 
         if ok then
             return true
@@ -261,9 +280,16 @@ function types.is_a(x, tp, assert_type)
 
         return false, msg
     else
-        tp = types.typeof(tp)
-        local ok = x_tp == tp
-        local msg = 'expected ' .. tp .. ', got ' .. x_tp
+        local ok, msg
+
+        if tp_name and x_tp_name then
+            ok = tp_name == x_tp_name
+            msg = 'expected ' .. tp_display .. ', got ' .. x_display
+            if not ok then error(msg) end
+        end
+
+        ok = x_tp == tp_tp
+        msg = 'expected ' .. tp_display.. ', got ' .. x_display
 
         if ok then
             return true

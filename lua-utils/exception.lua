@@ -7,32 +7,33 @@ exception = module.new "exception"
 local function new_exception(name, default_reason)
     local mt = {
         type = "exception",
-        __tostring = function(self) return pprint.dump(copy(self)) end,
+        __tostring = function(x) return pprint.dump(array.copy(x)) end,
     }
 
-    local self = {}
+    local self = { reason = default_reason }
 
     function self:throw(reason, context)
         if not context then
-            if not default_reason then error "no_default_reason" end
-            error(
-                setmetatable(
-                    { name, reason = default_reason, context = reason },
-                    { __tostring = mt.__tostring }
-                )
+            if not self.reason then error "no_default_reason" end
+
+            local obj = setmetatable(
+                { name, reason = self.reason, context = reason },
+                { __tostring = mt.__tostring }
             )
+
+            error(tostring(obj))
         else
-            error(
-                setmetatable(
-                    { name, reason = reason, context = context },
-                    { __tostring = mt.__tostring }
-                )
+            local obj = setmetatable(
+                { name, reason = reason, context = context },
+                { __tostring = mt.__tostring }
             )
+
+            error(tostring(obj))
         end
     end
 
     function self:assert(test, reason, context)
-        if test then return end
+        if test then return true end
         self:throw(reason, context)
     end
 
@@ -41,7 +42,7 @@ local function new_exception(name, default_reason)
     return setmetatable(self, mt)
 end
 
-function exception.new(name)
+function exception.new(name, reason)
     if types.is_table(name) then
         local out = {}
 
@@ -55,7 +56,7 @@ function exception.new(name)
         return out
     end
 
-    return new_exception(name)
+    return new_exception(name, reason)
 end
 
 return exception

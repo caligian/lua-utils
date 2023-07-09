@@ -8,23 +8,30 @@ local types = require "types"
 local module = require "module"
 local struct = require "struct"
 local exception = require "exception"
-local set = module.new "set"
-
-set.Set = struct.new("Set", { "value" })
-local Set = set.Set
+local Set = struct.new("Set", { "value" })
 
 --------------------------------------------------------------------------------
-function set.new(tbl)
-    tbl = tbl or {}
+function Set.init(st, tbl)
+    if types.is_string(tbl) then
+        local out = {}
 
-    if types.is_a(tbl, "Set") then
-        return tbl
-    elseif not types.is_table(tbl) or not types.is_array(tbl) then
-        return
+        for i = 1, #tbl do
+            out[i] = string.sub(tbl, i, i)
+        end
+
+        tbl = out
     end
 
-    local st = Set {}
-    st.value = array.todict(tbl)
+    tbl = utils.copy(tbl)
+
+    for i = 1, #tbl do
+        local v = tbl[i]
+        tbl[i] = nil
+        tbl[v] = v
+    end
+
+    st.value = tbl
+    st.array = table.sort(dict.keys(tbl))
 
     function st.__eq(obj, other) return Set.equals(obj, other) end
     function st.__ne(obj, other) return not Set.equals(obj, other) end
@@ -38,7 +45,9 @@ end
 --- M has value x?
 -- @param x value
 -- @treturn any
-function Set.has(obj, x) return obj.value[x] end
+function Set.has(obj, x) 
+    return obj.value[x] 
+end
 
 --- Add value to set
 -- @param x value
@@ -91,10 +100,10 @@ function Set.length(obj) return dict.len(obj.value) end
 -- @param ... rest of Ms/arrays to intersect with this set
 -- @treturn M
 function Set.intersection(obj, ...)
-    local out = set.new {}
+    local out = Set {}
 
     for _, Y in ipairs { ... } do
-        Y = set.new(Y)
+        Y = Set(Y)
 
         Set.each(obj, function(x)
             if Set.has(Y, x) then Set.add(out, x) end
@@ -117,7 +126,7 @@ function Set.is_disjoint(obj, y) return Set.len(Set.intersection(obj, y)) == 0 e
 -- @param ... other Ms|tables
 -- @treturn M
 function Set.complement(obj, ...)
-    local out = set.new {}
+    local out = Set {}
     local Z = Set.intersection(obj, ...)
 
     Set.each(obj, function(x)
@@ -137,10 +146,10 @@ end
 -- @param ... Ms|tables to use with current set
 -- @treturn M
 function Set.union(obj, ...)
-    local out = set.new {}
+    local out = Set {}
 
     for _, Y in ipairs { ... } do
-        Y = set.new(Y)
+        Y = Set(Y)
 
         Set.each(obj, function(x) Set.add(out, x) end)
 
@@ -160,10 +169,10 @@ end
 -- @param ... other sets
 -- @treturn M
 function Set.difference(obj, ...)
-    local out = set.new {}
+    local out = Set {}
 
     for _, Y in ipairs { ... } do
-        Y = set.new(Y)
+        Y = Set(Y)
 
         Set.each(obj, function(x)
             if not Set.has(Y, x) then Set.add(out, x) end
@@ -228,6 +237,4 @@ function Set.iter(obj)
     end
 end
 
-return set
-
-
+return Set

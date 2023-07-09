@@ -52,7 +52,7 @@ end
 --- Is dict blank?
 -- @tparam dict t
 -- @treturn boolean
-function dict.isblank(t)
+function dict.is_empty(t)
   return #dict.keys(t) == 0
 end
 
@@ -349,14 +349,8 @@ function dict.extract(x)
   return x, array_part
 end
 
-function dict.isdict(x)
-  if type(x) ~= 'table' then 
-    return false 
-  elseif #x > 0 then
-    return false
-  elseif #(dict.keys(x)) > 0 then
-    return true
-  end
+function dict.is_dict(x)
+    return types.is_dict(x)
 end
 
 return dict
