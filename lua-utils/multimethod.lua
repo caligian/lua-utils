@@ -1,15 +1,13 @@
 --- Multimethod implementation
 -- @classmod multimethod
 -- @alias mt
-local utils = require "utils"
-local dict = require "dict"
-local array = require "array"
-local types = require "types"
-local exception = require "exception"
-local param = require "param"
-local is_a = param.is_a
-local mt = {}
-local multimethod = setmetatable({}, mt)
+require "utils"
+require "exception"
+require "dict"
+require "array"
+
+local multimethod = module 'multimethod'
+
 multimethod.exception = {}
 local err = multimethod.exception
 
@@ -24,12 +22,7 @@ err.invalid_type_signature = exception.new(
 err.multiple_type_signatures =
     exception.new("duplicate_type_signature", "duplicate type signature found")
 
---- Set callable for type signature
--- @tparam callable f
--- @tparam any ... type specs
-function multimethod:set(f, ...) self.sig[{ ... }] = f end
-
-function multimethod.compare_sig(signature, params)
+function multimethod.match_signature(signature, params, callback)
     local status_i = 0
     local status = {}
     local sig_n = #signature
@@ -44,7 +37,8 @@ function multimethod.compare_sig(signature, params)
         if sig == "*" and param ~= nil then
             status[status_i + 1] = true
         else
-            local ok, _ = types.is(signature[i])(params[i])
+            local ok, _ = is_a(param, sig)
+            if not ok then return false end
             status[status_i + 1] = ok
         end
 
@@ -55,13 +49,23 @@ function multimethod.compare_sig(signature, params)
         status[i] = false
     end
 
-    return status
+    for i = 1, status_i do
+        if not status[i] then
+            return false, status
+        end
+    end
+
+    if callback then
+        return callback(unpack(params))
+    end
+
+    return true, status
 end
 
 function multimethod.get_matches(signatures, params)
     return array.grep(signatures, function(sig)
-        sig = multimethod.compare_sig(sig, params)
-        return sig and array.all(sig) or false
+        local ok, status = multimethod.match_signature(sig, params)
+        if ok then return status end
     end)
 end
 
@@ -86,14 +90,6 @@ function multimethod.get_best_match(signatures, params)
     return found[1]
 end
 
---- Get callable for a type signature
--- @tparam any ... type specs
--- @treturn callable or throw error
-function multimethod:get(...)
-    local match = multimethod.get_best_match(dict.keys(self.sig), { ... })
-    return self.sig[match]
-end
-
 --- Get a multimethod callable with .get and .set methods
 -- @static
 -- @usage
@@ -103,26 +99,38 @@ end
 -- @see multimethod.set
 -- @treturn callable
 function multimethod.new(spec)
-    local mod = {
-        get = multimethod.get,
-        set = multimethod.set,
-        sig = {},
-    }
+    local mt = {type = 'callable'}
+    local mod = setmetatable({sig = {}}, mt)
 
-    mod = setmetatable(mod, {
-        __call = function(self, ...) return self:get(...)(...) end,
-    })
+    function mod:get_match(...)
+        local match = multimethod.get_best_match(dict.keys(self.sig), { ... })
+        return self.sig[match]
+    end
+
+    function mod:set_method(signature, callback) 
+        self.sig[signature] = callback 
+    end
+
+    function mt:__call(...) 
+        return self:get_match(...)(...) 
+    end
+
+    function mt:__index(args)
+        return self:get_match(unpack(args))
+    end
+
+    function mt:__newindex(sig, callback)
+        return self:set_method(sig, callback)
+    end
 
     if spec then
         dict.each(spec, function(sig, callback)
             sig = array.to_array(sig)
-            mod:set(callback, unpack(sig))
+            mod:set_method(sig, callback)
         end)
     end
 
     return mod
 end
-
-function mt:__call() return self.new() end
 
 return multimethod

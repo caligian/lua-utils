@@ -2,8 +2,8 @@
 -- This module adds some much needed string manipulation utilities to lua.
 -- All the methods in this module are added to builtin string module
 -- @module str
-local utils = require "utils"
-local pprint = require 'pprint'
+require "utils"
+
 local str = {}
 
 --------------------------------------------------------------------------------
@@ -21,7 +21,7 @@ function str.find_all(s, pat, limit)
     local limit = limit or n
 
     while i <= limit do
-        local from, till = str.find(s, pat, init + 1)
+        local from, till = string.find(s, pat, init + 1)
         if from and till then
             pos[i] = { from, till }
             init = till
@@ -74,30 +74,6 @@ function str.split(s, delim, times)
     return out
 end
 
---- Alias for string.format
--- @param fmt format string
--- @param ... placeholder variables
--- @treturn string
-function str.sprintf(fmt, ...) return string.format(fmt, ...) end
-
---- Print formatted string
--- @see sprintf
--- @param fmt format string
--- @param ... placeholder variables
-function str.printf(fmt, ...) print(sprintf(fmt, ...)) end
-
---- Alias for string.format
--- @param fmt format string
--- @param ... placeholder variables
--- @treturn string
-function sprintf(fmt, ...) return str.format(fmt, ...) end
-
---- Print formatted string
--- @see sprintf
--- @param fmt format string
--- @param ... placeholder variables
-function printf(fmt, ...) print(sprintf(fmt, ...)) end
-
 --- Match any of the lua patterns
 -- @param s string
 -- @param ... lua patterns for OR matching
@@ -112,8 +88,6 @@ end
 --- Is string blank?
 -- @param x string
 -- @treturn boolean
-function str.is_blank(x) return #x == 0 end
-
 function str.is_empty(x) return #x == 0 end
 
 --- Print string
@@ -148,22 +122,41 @@ function str.sed(s, rep)
     return final
 end
 
---- Print string
--- @param s string
-function str.print(s) print(s) end
-
---- alias for string.format
--- @param fmt string.format format
--- @param ... placeholder variables
--- @treturn string
-function str.printf(fmt, ...) return string.format(fmt, ...) end
-
-for key, value in pairs(string) do
-    str[key] = value
+function str.printf(...)
+    return printf(...)
 end
 
-for key, value in pairs(str) do
-    string[key] = value
+function str.sprintf(...)
+    return sprintf(...)
 end
+
+function str.is_number(x)
+    return x:match '^[0-9]+$'
+end
+
+function str.is_alphanum(x)
+    return x:match '^[a-zA-Z0-9]+$'
+end
+
+function str.is_alpha(x)
+    return x:match '^[a-zA-Z]+$'
+end
+
+function str.is_variable(x)
+    return x:match('^[A-Za-z_]') and str.alphanum(x)
+end
+
+string.printf = printf
+string.sprintf = sprintf
+string.sed = str.sed
+string.splat = str.splat
+string.to_array = str.splat
+string.find_all = str.find_all
+string.len = str.len
+string.split = str.split
+string.is_alphanum = str.is_alphanum
+string.is_alpha = str.is_alpha
+string.is_variable = str.is_variable
+string.is_number = str.is_number
 
 return str

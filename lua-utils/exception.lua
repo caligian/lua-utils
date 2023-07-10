@@ -1,13 +1,13 @@
-local pprint = require "pprint"
-local dict = require "dict"
-local array = require "array"
-local module = require "module"
-exception = module.new "exception"
+require 'utils'
+require "dict"
+require "array"
+
+exception = module "exception"
 
 local function new_exception(name, default_reason)
     local mt = {
         type = "exception",
-        __tostring = function(x) return pprint.dump(array.copy(x)) end,
+        __tostring = function(x) return dump(copy(x)) end,
     }
 
     local self = { reason = default_reason }
@@ -43,7 +43,7 @@ local function new_exception(name, default_reason)
 end
 
 function exception.new(name, reason)
-    if types.is_table(name) then
+    if is_table(name) then
         local out = {}
 
         dict.each(
@@ -58,7 +58,3 @@ function exception.new(name, reason)
 
     return new_exception(name, reason)
 end
-
-return exception
-
-

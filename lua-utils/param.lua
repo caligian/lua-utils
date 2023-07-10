@@ -1,11 +1,11 @@
 --- Type validation utilities
-local param = {}
+require 'utils'
+require "dict"
+require "array"
+
 local Set = require "Set"
-local types = require "types"
-local dict = require "dict"
-local array = require "array"
 local str = require "str"
-local valid_types = types.builtin
+local param = {}
 
 local function filter_optional(spec, param)
     dict.each(dict.copy(spec), function(key, value)
@@ -79,13 +79,13 @@ local function validate_table(spec, param)
         if nonexistent == nil then nonexistent = true end
 
         if
-            types.typeof(expected) == "table"
-            and types.typeof(got) == "table"
+            typeof(expected) == "table"
+            and typeof(got) == "table"
         then
             expected.__name = k
             expected.__nonexistent = nonexistent
             validate_table(expected, got)
-        elseif types.typeof(expected) == "callable" then
+        elseif typeof(expected) == "callable" then
             local ok, msg = expected(got)
             msg = msg or sprintf("%s.%s: callable failed", t_name, k)
             if not ok then error(msg) end
@@ -130,7 +130,7 @@ end
 --
 -- --- Indexing is also supported
 -- -- error thrown
--- param.param.number('number', 'a')
+-- param.number('number', 'a')
 --
 -- @function param.validate
 -- @param spec_with_param type specs for params. See usage
@@ -145,21 +145,21 @@ param.validate = setmetatable({}, {
             local spec, param = unpack(value)
             if is_opt and param == nil then return end
 
-            if types.is_string(spec) then
-                local ok, msg = types.is_a(param, spec)
+            if is_string(spec) then
+                local ok, msg = is_a(param, spec)
                 if not ok then error(key .. ": " .. msg) end
-            elseif types.is_callable(spec) then
+            elseif is_callable(spec) then
                 local ok, msg = spec(param)
                 if not ok then
                     error(key .. ": " .. (msg or "callable failed"))
                 end
-            elseif types.is_array(spec) or types.is_dict(spec) then
-                if not types.is_table(param) then
+            elseif is_array(spec) or is_dict(spec) then
+                if not is_table(param) then
                     error(
                         key
                             .. ": "
                             .. "expected table, got "
-                            .. types.typeof(param)
+                            .. typeof(param)
                     )
                 end
 
@@ -169,7 +169,7 @@ param.validate = setmetatable({}, {
 
                 validate_table(spec, param)
             else
-                local ok, msg = types.is_a(param, spec)
+                local ok, msg = is_a(param, spec)
                 if not ok then error(sprintf("%s: %s", key, msg)) end
             end
         end)

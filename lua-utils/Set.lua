@@ -1,45 +1,52 @@
 --- dict-based Set objects
--- @classmod Set
+require "utils"
+require "array"
+require "dict"
+require "struct"
+require "exception"
 
-local array = require "array"
-local dict = require "dict"
-local utils = require "utils"
-local types = require "types"
-local module = require "module"
-local struct = require "struct"
-local exception = require "exception"
-local Set = struct.new("Set", { "value" })
+local Set = struct.new("Set", { "value", "array" })
 
 --------------------------------------------------------------------------------
-function Set.init(st, tbl)
-    if types.is_string(tbl) then
+function Set.init_before(x)
+    if is_array(x) then 
+        return {value=x} 
+    elseif is_string(tbl) then
         local out = {}
 
         for i = 1, #tbl do
             out[i] = string.sub(tbl, i, i)
         end
 
-        tbl = out
+        return {value = out}
     end
 
-    tbl = utils.copy(tbl)
+    return x
+end
 
-    for i = 1, #tbl do
-        local v = tbl[i]
-        tbl[i] = nil
-        tbl[v] = v
+function Set.init(x)
+    local value = x.value
+
+    for i = 1, #value do
+        local v = value[i]
+        value[i] = nil
+        value[v] = v
     end
 
-    st.value = tbl
-    st.array = table.sort(dict.keys(tbl))
+    x.value = value 
+    x.array = table.sort(dict.keys(value))
 
-    function st.__eq(obj, other) return Set.equals(obj, other) end
-    function st.__ne(obj, other) return not Set.equals(obj, other) end
-    function st.__sub(obj, other) return Set.difference(obj, other) end
-    function st.__add(obj, other) return Set.union(obj, other) end
-    function st.__pow(obj, other) return Set.intersection(obj, other) end
+    function x.__eq(obj, other) return Set.equals(obj, other) end
+    function x.__ne(obj, other) return not Set.equals(obj, other) end
+    function x.__sub(obj, other) return Set.difference(obj, other) end
+    function x.__add(obj, other) return Set.union(obj, other) end
+    function x.__pow(obj, other) return Set.intersection(obj, other) end
 
-    return st
+    return x
+end
+
+function Set.is_set(x)
+    return get_type_name(x) == 'Set'
 end
 
 --- M has value x?
@@ -150,9 +157,7 @@ function Set.union(obj, ...)
 
     for _, Y in ipairs { ... } do
         Y = Set(Y)
-
         Set.each(obj, function(x) Set.add(out, x) end)
-
         Set.each(Y, function(y) Set.add(out, y) end)
     end
 
@@ -186,7 +191,7 @@ end
 -- @param other M|table to compare
 -- @treturn boolean
 function Set.equals(obj, other)
-    if not types.is_table(other) then return end
+    if not is_table(other) then return end
 
     return array.compare(dict.values(obj.value), dict.values(other), nil, true)
 end
@@ -220,7 +225,7 @@ function Set.remove(obj, element)
     local has = obj.value[element]
     if has then
         obj.value[element] = nil
-        return utils.copy(has)
+        return copy(has)
     end
 end
 

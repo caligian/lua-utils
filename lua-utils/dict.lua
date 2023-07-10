@@ -1,17 +1,16 @@
 --- Tables as dictionaries
 -- @module dict
-local types = require "types"
-local utils = require "utils"
-local array = require "array"
+require "utils"
+require "array"
 
 --------------------------------------------------------------------------------
-local dict = {}
+dict = {}
 
 --- Shallow copy table
 -- @tparam dict x
 -- @treturn dict
-function dict.copy(x)
-  return utils.copy(x)
+function dictcopy(x)
+  return copy(x)
 end
 
 --- Get dict values
@@ -186,7 +185,7 @@ function dict.index(t, item, test, depth)
       local k = ks[i]
       local v = x[k]
 
-      if types.is_table(v) then
+      if is_table(v) then
         later[later_i + 1] = k
         later_i = later_i + 1
       elseif test(v, item) then
@@ -259,7 +258,7 @@ function dict.lmerge(...)
 
       if a == nil then
         t1[k] = v
-      elseif types.typeof(a) == "table" and types.typeof(b) == "table" then
+      elseif typeof(a) == "table" and typeof(b) == "table" then
         cache[a] = true
         array.append(later, { a, b })
       end
@@ -298,7 +297,7 @@ function dict.merge(...)
 
       if a == nil then
         t1[k] = v
-      elseif types.typeof(a) == "table" and types.typeof(b) == "table" then
+      elseif typeof(a) == "table" and typeof(b) == "table" then
         cache[a] = true
         array.append(later, { a, b })
       else
@@ -350,7 +349,5 @@ function dict.extract(x)
 end
 
 function dict.is_dict(x)
-    return types.is_dict(x)
+    return is_dict(x)
 end
-
-return dict

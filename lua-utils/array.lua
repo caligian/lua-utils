@@ -1,8 +1,8 @@
 --- Tables as arrays - utilties
 -- @module array
-local types = require "types"
-local utils = require "utils"
-local array = {}
+require "utils"
+
+array = {}
 
 --------------------------------------------------------------------------------
 -- Reverse array
@@ -42,7 +42,7 @@ end
 --- Shallow copy array
 -- @tparam array x
 -- @treturn array
-function array.copy(x) return utils.copy(x) end
+function array.copy(x) return copy(x) end
 
 --- Concat all elements of an array with a sep
 -- @tparam array x
@@ -187,7 +187,7 @@ function array.index(t, item, test, depth)
       array.append(layer, i)
 
       local v = x[i]
-      if types.is_table(v) then
+      if is_table(v) then
         later[later_i + 1] = { i, v }
         later_i = later_i + 1
       elseif test(v, item, layer) then
@@ -421,7 +421,7 @@ function array.compare(a, b, callback, no_state)
       local y_value = y[key]
       if not y_value then
         state[key] = false
-      elseif types.is_table(y_value) and types.is_table(value) then
+      elseif is_table(y_value) and is_table(value) then
         state[key] = {}
         state = state[key]
         later[#later + 1] = { value, y_value }
@@ -760,7 +760,5 @@ function array.deepcopy(x, callback)
 end
 
 function array.is_array(x)
-    return types.is_array(x)
+    return is_array(x)
 end
-
-return array
