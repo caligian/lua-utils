@@ -194,6 +194,32 @@ function thread(x, ...)
     return out
 end
 
+function values(t)
+    local out = {}
+    local i = 1
+
+    for _, value in pairs(t) do
+        out[i] = value
+        i = i + 1
+    end
+
+    return out
+end
+
+function keys(t, sort, cmp)
+    local out = {}
+    local i = 1
+
+    for key, _ in pairs(t) do
+        out[i] = key
+        i = i + 1
+    end
+
+    if sort then return table.sort(out, cmp) end
+
+    return out
+end
+
 -- Lua has 7 (excluding nil) distinct  We add 'class' and 'callable' to that list.
 -- However these types will be accessible only via .typeof
 -- @module types
@@ -241,7 +267,7 @@ function is_callable(x)
     local mt = getmetatable(x)
     if not mt then return false end
 
-    return mt.__call or mt.type == "callable" or false
+    return (mt.__call and #keys(mt) == 1) or mt.type == "callable" or false
 end
 
 --- Is x nil
@@ -276,7 +302,7 @@ function is_array(x)
     if mt.array then return true end
 
     for k, v in pairs(x) do
-        if not tostring(k):match "^[0-9]+$" or v == nil then return false end
+        if not tostring(k):match "^[0-9]+$" then return false end
     end
 
     mt.array = true
@@ -288,46 +314,38 @@ function is_dict(x)
     if not is_table(x) then
         return false
     else
-        local ks = {}
-
+        local found
         for key, value in pairs(x) do
-            ks[#ks+1] = key
+            found = key
             break
         end
 
-        if #ks == 0 then
-            return true
+        if found then
+            return false
         elseif is_array(x) then
             return false
         end
 
+        mtset(x, "dict", true)
         return true
     end
 end
 
 function is_empty(x)
-    if not is_string(x) or not is_table(x) then
-        return
+    if not is_string(x) or not is_table(x) then return end
+
+    for key, _ in pairs(x) do
+        if key then return x end
     end
 
-    if is_array(x) then
-        return #x == 0
-    elseif is_dict(x) then
-        local found
-        for key, _ in pairs(x) do
-            found = key
-            break
-        end
-
-        return found or false
-    end
+    return false
 end
 
 function get_type(x)
     if not is_table(x) then
         return
     elseif is_empty(x) then
-        return 'table'
+        return "table"
     elseif is_dict(x) then
         return "dict"
     elseif is_array(x) then
@@ -357,13 +375,23 @@ function typeof(x)
         return tp
     else
         tp, name = get_type(x)
-
-        if not tp then return "table", name end
+        if not tp then return "table" end
         return tp, name
     end
 end
 
-function is_struct(x) return get_type(x) == "struct" end
+function is_struct(x, name) 
+    local x, y = get_type(x)
+     
+    if x == 'struct' then
+        if name then
+            return name == y
+        end
+        return true
+    end
+
+    return false
+end
 
 function is_module(x) return get_type(x) == "module" end
 
@@ -400,7 +428,10 @@ is_a = setmetatable({}, {
     __index = function(self, key)
         return function(x)
             local tp = typeof(x)
-            if key == 'table' and (tp == 'array' or tp == 'dict' or tp == 'table') then
+            if
+                key == "table"
+                and (tp == "array" or tp == "dict" or tp == "table")
+            then
                 return true
             end
             return self(x, key)
@@ -452,7 +483,7 @@ is_a = setmetatable({}, {
                 return false, msg
             end
 
-            if (x_tp == 'array' or x_tp == 'dict') and tp == 'table' then
+            if (x_tp == "array" or x_tp == "dict") and tp == "table" then
                 return true
             end
 
@@ -486,7 +517,7 @@ is_a = setmetatable({}, {
 
             return false, msg
         end
-    end
+    end,
 })
 
 function is(x)
@@ -526,4 +557,18 @@ function deepcopy(x, callback)
     walk(x)
 
     return new
+end
+
+function is_type(x)
+    return get_type(x)
+end
+
+function is_named_type(x)
+    local tp, name = get_type(x)
+
+    if name then
+        return false
+    else
+        return name, tp
+    end
 end
