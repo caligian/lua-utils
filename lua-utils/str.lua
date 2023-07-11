@@ -2,7 +2,7 @@
 -- This module adds some much needed string manipulation utilities to lua.
 -- All the methods in this module are added to builtin string module
 -- @module str
-require "utils"
+require "lua-utils.utils"
 
 local str = {}
 
@@ -152,11 +152,12 @@ string.sed = str.sed
 string.splat = str.splat
 string.to_array = str.splat
 string.find_all = str.find_all
-string.len = str.len
+string.length = str.length
 string.split = str.split
 string.is_alphanum = str.is_alphanum
 string.is_alpha = str.is_alpha
 string.is_variable = str.is_variable
 string.is_number = str.is_number
+string.match_any = str.match_any
 
 return str

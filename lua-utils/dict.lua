@@ -1,7 +1,7 @@
 --- Tables as dictionaries
 -- @module dict
-require "utils"
-require "array"
+require "lua-utils.utils"
+require "lua-utils.array"
 
 --------------------------------------------------------------------------------
 dict = {}
@@ -9,8 +9,12 @@ dict = {}
 --- Shallow copy table
 -- @tparam dict x
 -- @treturn dict
-function dictcopy(x)
+function dict.copy(x)
   return copy(x)
+end
+
+function dict.deepcopy(x)
+    return deepcopy(x)
 end
 
 --- Get dict values
@@ -19,6 +23,7 @@ end
 function dict.values(t)
   local out = {}
   local i = 1
+
   for _, value in pairs(t) do
     out[i] = value
     i = i + 1
@@ -126,7 +131,7 @@ end
 --- Get dict length
 -- @tparam dict t
 -- @treturn number
-function dict.len(t)
+function dict.length(t)
   return #dict.keys(t)
 end
 
@@ -151,6 +156,10 @@ end
 -- @treturn dict
 function dict.update(tbl, keys, value)
   return array.update(tbl, keys, value)
+end
+
+function dict.update_(x, ...)
+    return dict.update(copy(x), ...)
 end
 
 --- Find an element in a dict using BFS search
@@ -216,6 +225,14 @@ function dict.get(tbl, ks, create_path)
   return array.get(tbl, ks, create_path)
 end
 
+function dict.get_update(x, ...)
+    return array.get_update(x, ...)
+end
+
+function dict.get_update_(x, ...)
+    return array.get_update_(x, ...)
+end
+
 --- Get element at path specified by key(s)
 -- @tparam dict|table tbl
 -- @tparam key|dict[keys] ... to get the element from
@@ -230,6 +247,10 @@ end
 -- @treturn dict
 function dict.makepath(t, ...)
   return dict.get(t, { ... }, true)
+end
+
+function dict.makepath_(t, ...)
+  return dict.get(deepcopy(t), { ... }, true)
 end
 
 --- Apply callable to a dict
@@ -280,6 +301,13 @@ function dict.lmerge(...)
   return start
 end
 
+function dict.lmerge_(...)
+    local args = {...}
+    args[1] = copy(args[1])
+
+    return dict.lmerge(args[1], unpack(array.rest(args)))
+end
+
 --- Merge two dicts
 -- @tparam  dict ...
 -- @treturn dict
@@ -321,6 +349,13 @@ function dict.merge(...)
   return start
 end
 
+function dict.merge_(...)
+    local args = {...}
+    args[1] = copy(args[1])
+
+    return dict.merge(args[1], unpack(array.rest(args)))
+end
+
 --- Remove an element by key(s)
 -- @tparam dict x
 -- @tparam key|dict[keys] ks
@@ -338,6 +373,10 @@ function dict.delete(x, ks)
   return obj
 end
 
+function dict.delete_(x, ks)
+    return dict.delete(deepcopy(x), ks)
+end
+
 --- Get the dict part. This mutates the table passed
 -- @tparam table x Table to get dict from
 -- @treturn dict, array
@@ -348,6 +387,55 @@ function dict.extract(x)
   return x, array_part
 end
 
+function dict.extract_(x)
+    return dict.extract(copy(x))
+end
+
 function dict.is_dict(x)
     return is_dict(x)
+end
+
+--- spec: {{name, {pattern, ...}}, ...}
+function dict.group_by_keys(x, spec)
+    local new = {unmatched = {}}
+    local unmatched = new.unmatched
+    local ks = dict.keys(x)
+    local n = #ks
+
+    dict.each(spec, function (name, pattern)
+        new[name] = {}
+        local current = new[name]
+
+        while n > 0 do
+            local key, value = ks[n], x[ks[n]]
+
+            if is_callable(pattern) and pattern(key) then
+                current[key] = value
+            elseif is_string(pattern) or is_array(pattern) then
+                pattern = to_array(pattern)
+                local found
+
+                for j = 1, #pattern do
+                    if key:match(pattern[j]) then
+                        found = true
+                        break
+                    end
+                end
+
+                if not found then
+                    unmatched[key] = value
+                else
+                    current[key] = value
+                end
+            else
+                unmatched[key] = value
+            end
+
+            array.remove(ks, n)
+            n = n - 1
+        end
+
+    end)
+
+    return new
 end

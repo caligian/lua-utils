@@ -13,7 +13,7 @@ valid_types = {
     boolean = true,
     struct = true,
     exception = true,
-    ['nil'] = true,
+    ["nil"] = true,
 }
 
 valid_metatable_keys = {
@@ -130,34 +130,30 @@ end
 -- @tparam callable f2 decorating function
 -- @treturn function
 function decorate(f1, f2)
-  return function(...)
-    return f2(f1(...))
-  end
+    return function(...) return f2(f1(...)) end
 end
 
 --- Apply an array of args to a function
 -- @tparam callable f
 -- @tparam array args to apply
 -- @treturn any
-function apply(f, args)
-  return f(unpack(args))
-end
+function apply(f, args) return f(unpack(args)) end
 
 --- Prepend args and apply params
 -- @tparam callable f
 -- @tparam array ... params to prepend
 -- @treturn any
 function rpartial(f, ...)
-  local outer = { ... }
-  return function(...)
-    local inner = { ... }
-    local len = #outer
-    for idx, a in ipairs(outer) do
-      inner[len + idx] = a
-    end
+    local outer = { ... }
+    return function(...)
+        local inner = { ... }
+        local len = #outer
+        for idx, a in ipairs(outer) do
+            inner[len + idx] = a
+        end
 
-    return f(unpack(inner))
-  end
+        return f(unpack(inner))
+    end
 end
 
 --- Append args and apply params
@@ -165,39 +161,37 @@ end
 -- @tparam array ... params to append
 -- @treturn any
 function partial(f, ...)
-  local outer = { ... }
-  return function(...)
-    local inner = { ... }
-    local len = #outer
-    for idx, a in ipairs(inner) do
-      outer[len + idx] = a
-    end
+    local outer = { ... }
+    return function(...)
+        local inner = { ... }
+        local len = #outer
+        for idx, a in ipairs(inner) do
+            outer[len + idx] = a
+        end
 
-    return f(unpack(outer))
-  end
+        return f(unpack(outer))
+    end
 end
 
 --- Return object
 -- @tparam any x
 -- @treturn any
-function identity(x)
-  return x
-end
+function identity(x) return x end
 
 --- Pass an element through N callables
 -- @tparam any x
 -- @tparam array[callable] ...
 -- @treturn any
 function thread(x, ...)
-  local out = x
-  local args = { ... }
+    local out = x
+    local args = { ... }
 
-  for i = 1, #args do
-    local f = args[i]
-    out = f(out)
-  end
+    for i = 1, #args do
+        local f = args[i]
+        out = f(out)
+    end
 
-  return out
+    return out
 end
 
 -- Lua has 7 (excluding nil) distinct  We add 'class' and 'callable' to that list.
@@ -210,77 +204,58 @@ end
 --- Is x a number?
 -- @tparam any x
 -- @treturn boolean
-function is_number(x)
-  return type(x) == "number"
-end
-
+function is_number(x) return type(x) == "number" end
 
 --- Is x a string?
 -- @tparam any x
 -- @treturn boolean
-function is_string(x)
-  return type(x) == "string"
-end
+function is_string(x) return type(x) == "string" end
 
 --- Is x a userdata?
 -- @tparam any x
 -- @treturn boolean
-function is_userdata(x)
-  return type(x) == "userdata"
-end
+function is_userdata(x) return type(x) == "userdata" end
 
 --- Is x a coroutine?
 -- @tparam any x
 -- @treturn boolean
-function is_thread(x)
-  return type(x) == "thread"
-end
+function is_thread(x) return type(x) == "thread" end
 
 --- Is x a boolean?
 -- @tparam any x
 -- @treturn boolean
-function is_boolean(x)
-  return type(x) == "boolean"
-end
+function is_boolean(x) return type(x) == "boolean" end
 
 --- Is x a function?
 -- @tparam any x
 -- @treturn boolean
-function is_function(x)
-  return type(x) == "function"
-end
+function is_function(x) return type(x) == "function" end
 
 function is_callable(x)
-    if type(x) == 'function' then
+    if type(x) == "function" then
         return true
-    elseif type(x) ~= 'table' then
+    elseif type(x) ~= "table" then
         return false
     end
 
     local mt = getmetatable(x)
     if not mt then return false end
 
-    return mt.__call or mt.type == 'callable' or false
+    return mt.__call or mt.type == "callable" or false
 end
 
 --- Is x nil
 -- @tparam any x
 -- @treturn boolean
-function is_nil(x)
-  return x == nil
-end
+function is_nil(x) return x == nil end
 
 --- Is x a table (array|dict)?
 -- @tparam any x
 -- @treturn boolean
-function is_table(x)
-  return type(x) == "table" 
-end
+function is_table(x) return type(x) == "table" end
 
 function get_type_name(x)
-    if not is_table(x) then
-        return
-    end
+    if not is_table(x) then return end
 
     local mt = getmetatable(x)
     if not mt then return end
@@ -288,18 +263,60 @@ function get_type_name(x)
     return mt.name
 end
 
+function is_array(x)
+    if not is_table(x) then
+        return false
+    elseif mtget(x, "type") or is_callable(x) then
+        return false
+    end
+
+    local mt = getmetatable(x) or {}
+    if mt.array then return true end
+
+    for k, v in pairs(x) do
+        if not tostring(k):match "^[0-9]+$" or v == nil then return false end
+    end
+
+    mt.array = true
+
+    return setmetatable(x, mt)
+end
+
+function is_dict(x, with_num)
+    if not is_table(x) then
+        return false
+    elseif mtget(x, "type") or is_callable(x) then
+        return false
+    end
+
+    local mt = getmetatable(x) or {}
+    if mt.dict then return true end
+
+    for k, v in pairs(x) do
+        if tostring(k):match "^[0-9]+$" and not with_num then return false end
+    end
+
+    mt.dict = true
+
+    return setmetatable(x, mt)
+end
+
 function get_type(x)
     if not is_table(x) then
         return
+    elseif is_dict(x) then
+        return "dict"
+    elseif is_array(x) then
+        return "array"
     end
 
     local mt = getmetatable(x)
     if not mt then return end
 
     if mt.array then
-        return 'array'
+        return "array"
     elseif mt.dict then
-        return 'dict'
+        return "dict"
     elseif mt.type then
         return mt.type, mt.name
     end
@@ -310,139 +327,125 @@ function typeof(x)
 
     if not tp then
         return false
-    elseif tp == 'function' then
-        return 'callable'
-    elseif tp ~= 'table' then
+    elseif tp == "function" then
+        return "callable"
+    elseif tp ~= "table" then
         return tp
     else
-        local tp, name = get_type(x)
+        tp, name = get_type(x)
 
-        if not tp then
-            return 'table', name
-        end
+        if not tp then return "table", name end
 
         return tp, name
     end
 end
 
-function is_struct(x)
-    return get_type(x) == 'struct'
-end
+function is_struct(x) return get_type(x) == "struct" end
 
-function is_module(x)
-    return get_type(x) == 'module'
-end
+function is_module(x) return get_type(x) == "module" end
 
-function is_exception(x)
-    return get_type(x) == 'module'
-end
-
-function is_array(x)
-    if not is_table(x) then
-        return false
-    elseif get_type(x) or is_callable(x) then
-        return false
-    end
-
-    local mt = getmetatable(x) or {}
-    if mt.array then return true end
-
-    for k, v in pairs(x) do
-        if not tostring(k):match('^[0-9]+$') then
-            return false
-        end
-    end
-
-    mt.array = true
-
-    return setmetatable(x, mt)
-end
-
-function is_dict(x)
-    if not is_table(x) then
-        return false
-    elseif get_type(x) or is_callable(x) then
-        return false
-    end
-
-    local mt = getmetatable(x) or {}
-    if mt.dict then return true end
-
-    for k, v in pairs(x) do
-        if tostring(k):match('^[0-9]+$') then
-            return false
-        end
-    end
-
-    mt.dict = true
-
-    return setmetatable(x, mt)
-end
+function is_exception(x) return get_type(x) == "module" end
 
 function union(...)
-    local args = {...}
+    local args = { ... }
 
     for i = 1, #args do
-        if args[i] == '*' then
+        if args[i] == "*" then
             return true
         elseif not is_string(args[i]) then
             args[i] = typeof(args[i])
         end
     end
 
-    local err_string = 'expected types: {' .. table.concat(args, ' ') .. '}, got '
+    local err_string = "expected types: {"
+        .. table.concat(args, " ")
+        .. "}, got "
 
-    return function (x)
+    return function(x)
         local tp = typeof(x)
         err_string = err_string .. tp
 
-        for i=1, #args do
-            if tp == args[i] then
-                return true
-            end
+        for i = 1, #args do
+            if tp == args[i] then return true end
         end
 
         return false, err_string
     end
 end
 
-function is_a(x, tp, assert_type)
-    local x_tp, x_tp_name = typeof(x)
-    if not x_tp and x_tp_name then error('invalid object ' .. dump(x)) end
+is_a = setmetatable({}, {
+    __index = function(self, key)
+        return function(x)
+            return self(x, key)
+        end
+    end,
+    __call = function(self, x, tp, assert_type)
+        local x_tp, x_tp_name = typeof(x)
+        if not x_tp and x_tp_name then error("invalid object " .. dump(x)) end
 
-    local tp_tp, tp_name = typeof(tp)
-    if not tp_tp and tp_tp_name then error('invalid object ' .. dump(x)) end
+        local tp_tp, tp_name = typeof(tp)
+        if not tp_tp and tp_tp_name then error("invalid object " .. dump(x)) end
 
-    local x_display
-    local tp_display
-    if x_tp_name then
-        x_display = string.format('%s (%s)', x_tp_name or '', x_tp)
-    else
-        x_display = string.format('%s', x_tp)
-    end
-
-
-    if tp_name then
-        tp_display = string.format('%s (%s)', tp_name or '', tp_tp)
-    else
-        tp_display = string.format('%s', tp_tp)
-    end
-
-    if tp_tp == 'callable' then
-        local ok, msg = tp(x)
-
-        if not ok then 
-            if assert_type then error(msg) end
-            return false, msg 
+        local x_display
+        local tp_display
+        if x_tp_name then
+            x_display = string.format("%s (%s)", x_tp_name or "", x_tp)
+        else
+            x_display = string.format("%s", x_tp)
         end
 
-        return true
-    elseif tp_tp == 'array' then
-        return is_a(x, union(unpack(tp)), assert_type)
-    elseif tp_tp == 'string' then
-        if tp:match '^[A-Z]' then
-            local ok = x_tp_name == tp
-            local msg = 'expected ' .. tp_display .. ', got ' .. x_display 
+        if tp_name then
+            tp_display = string.format("%s (%s)", tp_name or "", tp_tp)
+        else
+            tp_display = string.format("%s", tp_tp)
+        end
+
+        if tp_tp == "callable" then
+            local ok, msg = tp(x)
+
+            if not ok then
+                if assert_type then error(msg) end
+                return false, msg
+            end
+
+            return true
+        elseif tp_tp == "array" then
+            return is_a(x, union(unpack(tp)), assert_type)
+        elseif tp_tp == "string" then
+            if tp:match "^[A-Z]" then
+                local ok = x_tp_name == tp
+                local msg = "expected " .. tp_display .. ", got " .. x_display
+
+                if ok then
+                    return true
+                elseif assert_type and not ok then
+                    error(msg)
+                end
+
+                return false, msg
+            end
+
+            local ok = x_tp == tp
+            local msg = "expected " .. tp_display .. ", got " .. x_display
+
+            if ok then
+                return true
+            elseif assert_type and not ok then
+                error(msg)
+            end
+
+            return false, msg
+        else
+            local ok, msg
+
+            if tp_name and x_tp_name then
+                ok = tp_name == x_tp_name
+                msg = "expected " .. tp_display .. ", got " .. x_display
+                if not ok then error(msg) end
+            end
+
+            ok = x_tp == tp_tp
+            msg = "expected " .. tp_display .. ", got " .. x_display
 
             if ok then
                 return true
@@ -452,44 +455,44 @@ function is_a(x, tp, assert_type)
 
             return false, msg
         end
-
-        local ok = x_tp == tp
-        local msg = 'expected ' .. tp_display .. ', got ' .. x_display
-
-        if ok then
-            return true
-        elseif assert_type and not ok then
-            error(msg)
-        end
-
-        return false, msg
-    else
-        local ok, msg
-
-        if tp_name and x_tp_name then
-            ok = tp_name == x_tp_name
-            msg = 'expected ' .. tp_display .. ', got ' .. x_display
-            if not ok then error(msg) end
-        end
-
-        ok = x_tp == tp_tp
-        msg = 'expected ' .. tp_display.. ', got ' .. x_display
-
-        if ok then
-            return true
-        elseif assert_type and not ok then
-            error(msg)
-        end
-
-        return false, msg
     end
-end
+})
 
 function is(x)
-    if not is_array(x) then x = {x} end
+    if not is_array(x) then x = { x } end
     return union(unpack(x))
 end
 
-function assert_type(x, tp)
-    return is_a(x, tp, true)
+function assert_type(x, tp) return is_a(x, tp, true) end
+
+function deepcopy(x, callback)
+    if type(x) ~= "table" then return x end
+
+    local cache = {}
+    local new = new or {}
+    local current = new
+
+    local function walk(tbl)
+        if cache[tbl] then
+            return
+        else
+            cache[tbl] = true
+        end
+
+        for key, value in pairs(tbl) do
+            if type(value) == "table" and not cache[tbl] then
+                current[key] = {}
+                current = current[key]
+                deepcopy(value)
+            elseif callback then
+                current[key] = callback(value)
+            else
+                current[key] = value
+            end
+        end
+    end
+
+    walk(x)
+
+    return new
 end

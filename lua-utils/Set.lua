@@ -1,9 +1,9 @@
 --- dict-based Set objects
-require "utils"
-require "array"
-require "dict"
-require "struct"
-require "exception"
+require "lua-utils.utils"
+require "lua-utils.array"
+require "lua-utils.dict"
+require "lua-utils.struct"
+require "lua-utils.exception"
 
 local Set = struct.new("Set", { "value", "array" })
 
@@ -97,11 +97,11 @@ function Set.filter(obj, f) return array.filter(Set.items(obj), f) end
 
 --- Get set length
 -- @treturn set length
-function Set.len(obj) return dict.len(obj.value) end
+function Set.length(obj) return dict.length(obj.value) end
 
 --- Get set length
 -- @treturn set length
-function Set.length(obj) return dict.len(obj.value) end
+function Set.length(obj) return dict.length(obj.value) end
 
 --- M intersection
 -- @param ... rest of Ms/arrays to intersect with this set
@@ -127,7 +127,7 @@ end
 --- Are sets disjoint?
 -- @param y other M|table
 -- @treturn boolean
-function Set.is_disjoint(obj, y) return Set.len(Set.intersection(obj, y)) == 0 end
+function Set.is_disjoint(obj, y) return Set.length(Set.intersection(obj, y)) == 0 end
 
 --- Get the complement of current set with others sets
 -- @param ... other Ms|tables
@@ -209,14 +209,14 @@ function Set.not_equals(obj, other) return not Set.equals(obj, other) end
 -- @param other other M|table
 -- @treturn boolean
 function Set.is_subset(obj, other)
-    return Set.len(Set.difference(obj, other)) == 0
+    return Set.length(Set.difference(obj, other)) == 0
 end
 
 --- Is this set a superset of other set?
 -- @param other other M|table
 -- @treturn boolean
 function Set.is_superset(obj, other)
-    return Set.len(Set.difference(other, obj)) == 0
+    return Set.length(Set.difference(other, obj)) == 0
 end
 
 --- Remove element from set

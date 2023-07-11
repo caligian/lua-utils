@@ -1,7 +1,7 @@
-require "utils"
-require "exception"
-require "array"
-require "dict"
+require "lua-utils.utils"
+require "lua-utils.exception"
+require "lua-utils.array"
+require "lua-utils.dict"
 
 struct = module "struct"
 
@@ -9,25 +9,29 @@ struct.exception = exception.new {
     invalid_attribute = "undefined attribute passed",
 }
 
-function struct.is_struct(st)
-    return is_struct(st)
+function struct.is_struct(st) return is_struct(st) end
+
+function struct.get_valid_attribs(st)
+    return mtget(st, 'valid_attribs')
 end
 
 function struct.equals(st1, st2, opts)
     assert(struct.is_struct(st1), "invalid_struct1")
     assert(struct.is_struct(st2), "invalid_struct2")
 
+    if struct.name(st1) ~= struct.name(st2) then
+        return false
+    end
+
     opts = opts or {}
     local absolute = opts.compare_tables
     local callback = opts.callback
+    local subset = opts.subset
+    local ks1, ks2 = dict.keys(st1), dict.keys(st2)
 
-    if not struct.is_struct(st1) then return false end
-    if not struct.is_struct(st2) then return false end
-
-    local ks1 = dict.keys(st1)
-    local ks2 = dict.keys(st2)
-
-    if #ks1 ~= #ks2 then return false end
+    if not subset and #ks1 ~= #ks2 then 
+        return false
+    end
 
     for i = 1, #ks1 do
         local k = ks1[i]
@@ -96,10 +100,15 @@ function struct.add_method(ctor, name, callback, static)
     end
 
     rawset(ctor, name, method)
+
+    return method
 end
 
 function struct.new(name, valid_attribs)
     if not valid_attribs then error "no valid attribs passed" end
+
+    local _valid_attribs = valid_attribs
+    valid_attribs = copy(valid_attribs)
 
     for i = 1, #valid_attribs do
         valid_attribs[valid_attribs[i]] = i
@@ -121,15 +130,24 @@ function struct.new(name, valid_attribs)
 
                 error("attempting to add attribute to " .. dump(opts))
             end,
+            __index = function(_, key)
+                if valid_metatable_keys[key] then return mt[key] end
+            end,
+            __eq = struct.equals,
+            __ne = struct.not_equals,
+            __tostring = function (self)
+                self = copy(self)
+                self[1] = _valid_attribs
+                return dump(self)
+            end
         }
 
-        opts = opts or {}
+        opts = copy(opts or {})
         if init_before then opts = init_before(opts) end
 
-        opts = setmetatable(copy(opts), mt)
+        opts = setmetatable(opts, mt)
 
         if init then return init(opts) end
-
         return opts
     end
 
@@ -146,26 +164,22 @@ function struct.new(name, valid_attribs)
             return new(opts, self.init_before, self.init)
         end,
         __newindex = function(self, key, value)
-            if valid_metatable_keys[key] then
-                return mtset(self, key, value)
-            else
-                if is_callable(value) then
-                    if key:match "^static_" then
-                        struct.add_method(
-                            self,
-                            key:gsub("^static_", ""),
-                            value,
-                            true
-                        )
-                    else
-                        struct.add_method(self, key, value)
-                    end
+            if is_callable(value) then
+                if key:match "^static_" then
+                    struct.add_method(
+                        self,
+                        key:gsub("^static_", ""),
+                        value,
+                        true
+                    )
+                else
+                    struct.add_method(self, key, value)
                 end
             end
 
             struct.exception.invalid_attribute:assert(key)
-            rawset(self, key, value)
 
+            rawset(self, key, value)
             return value
         end,
     })

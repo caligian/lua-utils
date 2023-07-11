@@ -1,6 +1,6 @@
 --- Tables as arrays - utilties
 -- @module array
-require "utils"
+require "lua-utils.utils"
 
 array = {}
 
@@ -39,6 +39,10 @@ function array.pop(t, n)
   end
 end
 
+function array.pop_(t, n)
+    return array.pop(copy(t), n)
+end
+
 --- Shallow copy array
 -- @tparam array x
 -- @treturn array
@@ -66,7 +70,9 @@ end
 -- @param x array
 -- @param i index
 -- @treturn ?any element found at index
-function array.remove(x, i) return table.remove(x, i) end
+function array.remove(x, i) return table.remove(x, i), x end
+
+function array.remove_(x, i) return array.remove(copy(x), i) end
 
 --- Sort array. Modifies the array
 -- @tparam array x
@@ -75,6 +81,10 @@ function array.remove(x, i) return table.remove(x, i) end
 function array.sort(x, cmp)
   table.sort(x, cmp)
   return x
+end
+
+function array.sort_(x, cmp)
+    return array.sort(copy(x), cmp)
 end
 
 --- Is array blank?
@@ -95,6 +105,10 @@ function array.append(x, ...)
   return x
 end
 
+function array.append_(x, ...)
+    return array.append(copy(x), ...)
+end
+
 --- Append elements to array at index. Modifies the array
 -- @tparam array t
 -- @tparam index idx
@@ -108,6 +122,10 @@ function array.iappend(t, idx, ...)
   return t
 end
 
+function array.iappend_(t, idx, ...)
+    return array.iappend(copy(t), idx, ...)
+end
+
 --- Add elements at the beginning of the array. Modifies the array
 -- @param t array
 -- @param ... elements to prepend the array with
@@ -118,6 +136,10 @@ function array.unshift(t, ...)
   end
 
   return t
+end
+
+function array.unshift_(t, ...)
+    return array.unshift(copy(t), ...)
 end
 
 --- Convert an element into an array
@@ -341,7 +363,7 @@ end
 --- Get array length
 -- @tparam array x
 -- @treturn number
-function array.len(x) return #x == 0 end
+function array.length(x) return #x == 0 end
 
 --- Extend array with other tables or non-tables. Modifies the array
 -- @tparam array tbl to extend
@@ -360,6 +382,10 @@ function array.extend(tbl, ...)
   end
 
   return tbl
+end
+
+function array.extend_(x, ...)
+    return array.extend(copy(x), ...)
 end
 
 --- Compare two arrays/tables
@@ -563,6 +589,10 @@ function array.update(tbl, keys, value)
   return value, t
 end
 
+function array.update_(x, ...)
+    return array.update(deepcopy(x), ...)
+end
+
 --- Get element at path specified by key(s)
 -- @tparam array|table tbl
 -- @tparam key|array[keys] ks to get the element from
@@ -594,8 +624,24 @@ function array.get(tbl, ks, create_path)
 
   local n = #ks
   local v = t[ks[n]]
+
   if v == nil and create_path then t[ks[n]] = {} end
   if t[ks[n]] then return t[ks[n]], t end
+end
+
+function array.get_update(tbl, ks, value)
+    ks = array.to_array(ks)
+    local _ 
+    _, tbl = array.get(tbl, ks)
+
+    if not tbl then return end
+    tbl[ks[#ks]] = value
+
+    return value, tbl
+end
+
+function array.get_update_(tbl, ...)
+    return array.get_update(deepcopy(tbl), ...)
 end
 
 --- Return a subarray specified by index
@@ -634,6 +680,10 @@ function array.contains(tbl, ...) return (array.get(tbl, { ... })) end
 -- @tparam any ... key(s) where the new table shall be made
 -- @treturn array
 function array.makepath(t, ...) return array.get(t, { ... }, true) end
+
+function array.makepath_(t, ...)
+    return array.makepath(deepcopy(t), ...)
+end
 
 --- Return a number range
 -- @tparam number from start index
@@ -687,6 +737,10 @@ function array.delete(tbl, ...)
   return obj
 end
 
+function array.delete_(x, ...)
+    return array.delete(deepcopy(x), ...)
+end
+
 --- Check if all the elements are truthy
 -- @tparam array t
 -- @treturn boolean
@@ -727,38 +781,16 @@ function array.extract(x)
   return out
 end
 
+function array.extract_(x)
+    return array.extract(copy(x))
+end
+
 function array.deepcopy(x, callback)
-  if type(x) ~= "table" then return x end
-
-  local cache = {}
-  local new = new or {}
-  local current = new
-
-  local function walk(tbl)
-    if cache[tbl] then
-      return
-    else
-      cache[tbl] = true
-    end
-
-    dict.each(tbl, function(key, value)
-      if type(value) == "table" and not cache[tbl] then
-        current[key] = {}
-        current = current[key]
-        array.deepcopy(value)
-      elseif callback then
-        current[key] = callback(value)
-      else
-        current[key] = value
-      end
-    end)
-  end
-
-  walk(x)
-
-  return new
+    return deepcopy(x, callback)
 end
 
 function array.is_array(x)
     return is_array(x)
 end
+
+to_array = array.to_array

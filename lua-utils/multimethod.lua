@@ -1,12 +1,12 @@
 --- Multimethod implementation
 -- @classmod multimethod
 -- @alias mt
-require "utils"
-require "exception"
-require "dict"
-require "array"
+require "lua-utils.utils"
+require "lua-utils.exception"
+require "lua-utils.dict"
+require "lua-utils.array"
 
-local multimethod = module 'multimethod'
+multimethod = module 'multimethod'
 
 multimethod.exception = {}
 local err = multimethod.exception
@@ -133,4 +133,13 @@ function multimethod.new(spec)
     return mod
 end
 
-return multimethod
+function when(spec)
+    assert(is_dict(spec), 'dict expected, got ' .. typeof(spec))
+
+    spec = copy(spec)
+    local value = spec.value
+    spec.value = nil
+
+    local m = multimethod.new(spec)
+    return m(value)
+end

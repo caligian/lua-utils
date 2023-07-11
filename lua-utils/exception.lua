@@ -1,6 +1,6 @@
-require 'utils'
-require "dict"
-require "array"
+require 'lua-utils.utils'
+require "lua-utils.dict"
+require "lua-utils.array"
 
 exception = module "exception"
 
@@ -8,9 +8,13 @@ local function new_exception(name, default_reason)
     local mt = {
         type = "exception",
         __tostring = function(x) return dump(copy(x)) end,
+        __mod = function (x, self)
+            if not x then self:throw() end
+            return x
+        end,
     }
 
-    local self = { reason = default_reason }
+    local self = { name = name, reason = default_reason }
 
     function self:throw(reason, context)
         if not context then
@@ -57,4 +61,8 @@ function exception.new(name, reason)
     end
 
     return new_exception(name, reason)
+end
+
+function exception:__call(self, ...)
+	return exception.new(self, ...)
 end
