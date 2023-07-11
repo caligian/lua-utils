@@ -282,23 +282,14 @@ function is_array(x)
     return setmetatable(x, mt)
 end
 
-function is_dict(x, with_num)
+function is_dict(x)
     if not is_table(x) then
         return false
-    elseif mtget(x, "type") or is_callable(x) then
+    elseif is_array(x) then
         return false
+    else
+        return true
     end
-
-    local mt = getmetatable(x) or {}
-    if mt.dict then return true end
-
-    for k, v in pairs(x) do
-        if tostring(k):match "^[0-9]+$" and not with_num then return false end
-    end
-
-    mt.dict = true
-
-    return setmetatable(x, mt)
 end
 
 function get_type(x)
