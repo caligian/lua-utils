@@ -305,9 +305,29 @@ function is_dict(x)
     end
 end
 
+function is_empty(x)
+    if not is_string(x) or not is_table(x) then
+        return
+    end
+
+    if is_array(x) then
+        return #x == 0
+    elseif is_dict(x) then
+        local found
+        for key, _ in pairs(x) do
+            found = key
+            break
+        end
+
+        return found or false
+    end
+end
+
 function get_type(x)
     if not is_table(x) then
         return
+    elseif is_empty(x) then
+        return 'table'
     elseif is_dict(x) then
         return "dict"
     elseif is_array(x) then
