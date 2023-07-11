@@ -266,6 +266,8 @@ end
 function is_array(x)
     if not is_table(x) then
         return false
+    elseif #x == 0 then
+        return true
     elseif mtget(x, "type") or is_callable(x) then
         return false
     end
@@ -285,9 +287,20 @@ end
 function is_dict(x)
     if not is_table(x) then
         return false
-    elseif is_array(x) then
-        return false
     else
+        local ks = {}
+
+        for key, value in pairs(x) do
+            ks[#ks+1] = key
+            break
+        end
+
+        if #ks == 0 then
+            return true
+        elseif is_array(x) then
+            return false
+        end
+
         return true
     end
 end
@@ -366,7 +379,8 @@ end
 is_a = setmetatable({}, {
     __index = function(self, key)
         return function(x)
-            if key == 'table' and type(x) == 'table' then
+            local tp = typeof(x)
+            if key == 'table' and tp == 'array' or tp == 'dict' then
                 return true
             end
             return self(x, key)
@@ -416,6 +430,10 @@ is_a = setmetatable({}, {
                 end
 
                 return false, msg
+            end
+
+            if x_tp == 'array' or x_tp == 'dict' and tp == 'table' then
+                return true
             end
 
             local ok = x_tp == tp
