@@ -380,7 +380,7 @@ is_a = setmetatable({}, {
     __index = function(self, key)
         return function(x)
             local tp = typeof(x)
-            if key == 'table' and tp == 'array' or tp == 'dict' then
+            if key == 'table' and (tp == 'array' or tp == 'dict') then
                 return true
             end
             return self(x, key)
