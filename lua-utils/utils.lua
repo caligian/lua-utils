@@ -335,7 +335,6 @@ function typeof(x)
         tp, name = get_type(x)
 
         if not tp then return "table", name end
-
         return tp, name
     end
 end
@@ -376,6 +375,9 @@ end
 is_a = setmetatable({}, {
     __index = function(self, key)
         return function(x)
+            if key == 'table' and type(x) == 'table' then
+                return true
+            end
             return self(x, key)
         end
     end,
