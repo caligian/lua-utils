@@ -102,21 +102,27 @@ function multimethod.new(spec)
     local mt = {type = 'callable'}
     local mod = setmetatable({sig = {}}, mt)
 
-    function mod:get_match(...)
+    function mod:get_method(...)
         local match = multimethod.get_best_match(dict.keys(self.sig), { ... })
         return self.sig[match]
     end
 
-    function mod:set_method(signature, callback) 
-        self.sig[signature] = callback 
+    function mod:set_method(signature, callback, prepend) 
+        self.sig[signature] = function (...)
+            if prepend ~= nil then
+                return callback(prepend, ...)
+            else
+                return callback(...)
+            end
+        end
     end
 
     function mt:__call(...) 
-        return self:get_match(...)(...) 
+        return self:get_method(...)(...) 
     end
 
     function mt:__index(args)
-        return self:get_match(unpack(args))
+        return self:get_method(unpack(args))
     end
 
     function mt:__newindex(sig, callback)
@@ -124,22 +130,15 @@ function multimethod.new(spec)
     end
 
     if spec then
+        spec = copy(spec)
+        local prepend = spec.prepend
+        spec.prepend = nil
+
         dict.each(spec, function(sig, callback)
             sig = array.to_array(sig)
-            mod:set_method(sig, callback)
+            mod:set_method(sig, callback, prepend)
         end)
     end
 
     return mod
-end
-
-function when(spec)
-    assert(is_dict(spec), 'dict expected, got ' .. typeof(spec))
-
-    spec = copy(spec)
-    local value = spec.value
-    spec.value = nil
-
-    local m = multimethod.new(spec)
-    return m(value)
 end
