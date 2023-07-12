@@ -100,7 +100,7 @@ end
 -- @treturn callable
 function multimethod.new(spec)
     local mt = {type = 'callable'}
-    local mod = setmetatable({sig = {}}, mt)
+    local mod = setmetatable({signatures = {}}, mt)
 
     function mod:get_method(...)
         local match = multimethod.get_best_match(dict.keys(self.signatures), { ... })
@@ -124,5 +124,3 @@ function multimethod.new(spec)
 
     return mod
 end
-
-filetype.format_buffer('lua', buffer.bufnr())
