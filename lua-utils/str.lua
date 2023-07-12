@@ -3,7 +3,6 @@
 -- All the methods in this module are added to builtin string module
 -- @module str
 require "lua-utils.utils"
-
 local str = {}
 
 --------------------------------------------------------------------------------

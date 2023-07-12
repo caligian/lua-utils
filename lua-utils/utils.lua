@@ -1,6 +1,6 @@
 --- Misc utilities
 -- @module utils
-local inspect = require "inspect"
+inspect = require "inspect"
 
 valid_types = {
     userdata = true,
@@ -292,10 +292,10 @@ end
 function is_array(x)
     if not is_table(x) then
         return false
-    elseif #x == 0 then
-        return true
     elseif mtget(x, "type") or is_callable(x) then
         return false
+    elseif #x == 0 then
+        return true
     end
 
     local mt = getmetatable(x) or {}
@@ -332,13 +332,16 @@ function is_dict(x)
 end
 
 function is_empty(x)
-    if not is_string(x) or not is_table(x) then return end
-
-    for key, _ in pairs(x) do
-        if key then return x end
+    if not is_string(x) and not is_table(x) then 
+        return 
+    elseif is_string(x) then
+        return #x == 0
     end
 
-    return false
+    local key = next(x)
+    if key then return false end
+
+    return true
 end
 
 function get_type(x)
@@ -373,6 +376,8 @@ function typeof(x)
         return "callable"
     elseif tp ~= "table" then
         return tp
+    elseif is_empty(x) then
+        return 'table'
     else
         tp, name = get_type(x)
         if not tp then return "table" end
@@ -427,17 +432,14 @@ end
 is_a = setmetatable({}, {
     __index = function(self, key)
         return function(x)
-            local tp = typeof(x)
-            if
-                key == "table"
-                and (tp == "array" or tp == "dict" or tp == "table")
-            then
-                return true
-            end
             return self(x, key)
         end
     end,
     __call = function(self, x, tp, assert_type)
+        if tp == 'table' and type(x) == 'table' then
+            return true
+        end
+
         local x_tp, x_tp_name = typeof(x)
         if not x_tp and x_tp_name then error("invalid object " .. dump(x)) end
 
@@ -446,6 +448,7 @@ is_a = setmetatable({}, {
 
         local x_display
         local tp_display
+
         if x_tp_name then
             x_display = string.format("%s (%s)", x_tp_name or "", x_tp)
         else
@@ -470,32 +473,44 @@ is_a = setmetatable({}, {
         elseif tp_tp == "array" then
             return is_a(x, union(unpack(tp)), assert_type)
         elseif tp_tp == "string" then
-            if tp:match "^[A-Z]" then
-                local ok = x_tp_name == tp
-                local msg = "expected " .. tp_display .. ", got " .. x_display
+            tp_tp = ''
+            tp_display = ''
 
-                if ok then
+            local match_tp, match_name
+            match_tp = tp:match '^[a-zA-Z0-9_]+%.'
+            match_name = tp:match '[a-zA-Z0-9_]+$'
+
+            if not match_tp and not match_name then
+                error('invalid type ' .. tp)
+            elseif match_name then
+                tp_tp = match_name
+                tp_display = tp_tp
+            else
+                tp_tp = match_tp
+                tp_name = match_name
+                tp_display = sprintf('%s (%s)', tp_name, tp_tp)
+            end
+
+            local msg = 'expected ' .. tp_display .. ', got ' .. x_display
+
+            if tp_tp and tp_name then
+                if tp_tp == x_tp and tp_name == x_tp_name then
                     return true
-                elseif assert_type and not ok then
+                elseif assert_type then
                     error(msg)
+                else
+                    return false, msg
                 end
-
-                return false, msg
+            elseif tp_tp then
+                if tp_tp == x_tp then
+                    return true
+                elseif assert_type then
+                    error(msg)
+                else
+                    return false, msg
+                end
             end
-
-            if (x_tp == "array" or x_tp == "dict") and tp == "table" then
-                return true
-            end
-
-            local ok = x_tp == tp
-            local msg = "expected " .. tp_display .. ", got " .. x_display
-
-            if ok then
-                return true
-            elseif assert_type and not ok then
-                error(msg)
-            end
-
+        
             return false, msg
         else
             local ok, msg

@@ -5,7 +5,7 @@ require "lua-utils.dict"
 require "lua-utils.struct"
 require "lua-utils.exception"
 
-local Set = struct.new("Set", { "value", "array" })
+Set = struct.new("Set", { "value", "array" })
 
 --------------------------------------------------------------------------------
 function Set.init_before(x)

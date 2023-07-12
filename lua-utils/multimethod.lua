@@ -121,14 +121,6 @@ function multimethod.new(spec)
         return self:get_method(...)(...) 
     end
 
-    function mt:__index(args)
-        return self:get_method(unpack(args))
-    end
-
-    function mt:__newindex(sig, callback)
-        return self:set_method(sig, callback)
-    end
-
     if spec then
         spec = copy(spec)
         local prepend = spec.prepend

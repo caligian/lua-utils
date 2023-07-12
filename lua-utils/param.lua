@@ -3,8 +3,7 @@ require "lua-utils.utils"
 require "lua-utils.dict"
 require "lua-utils.array"
 require "lua-utils.str"
-
-local Set = require "lua-utils.Set"
+require "lua-utils.Set"
 
 local function filter_optional(spec, param)
     dict.each(dict.copy(spec), function(key, value)
