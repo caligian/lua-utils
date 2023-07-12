@@ -103,18 +103,12 @@ function multimethod.new(spec)
     local mod = setmetatable({sig = {}}, mt)
 
     function mod:get_method(...)
-        local match = multimethod.get_best_match(dict.keys(self.sig), { ... })
-        return self.sig[match]
+        local match = multimethod.get_best_match(dict.keys(self.signatures), { ... })
+        return self.signatures[match]
     end
 
-    function mod:set_method(signature, callback, prepend) 
-        self.sig[signature] = function (...)
-            if prepend ~= nil then
-                return callback(prepend, ...)
-            else
-                return callback(...)
-            end
-        end
+    function mod:set_method(signature, callback) 
+        self.signatures[signature] = callback
     end
 
     function mt:__call(...) 
@@ -122,15 +116,13 @@ function multimethod.new(spec)
     end
 
     if spec then
-        spec = copy(spec)
-        local prepend = spec.prepend
-        spec.prepend = nil
-
         dict.each(spec, function(sig, callback)
             sig = array.to_array(sig)
-            mod:set_method(sig, callback, prepend)
+            mod:set_method(sig, callback)
         end)
     end
 
     return mod
 end
+
+filetype.format_buffer('lua', buffer.bufnr())
