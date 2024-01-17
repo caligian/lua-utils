@@ -30,6 +30,7 @@ function case.test(obj, spec, opts)
 
   if is_function(spec) and (cond or match) then
     local ok, msg = spec(obj)
+
     if not ok then
       if ass then
         if msg then
@@ -467,6 +468,19 @@ function case.rules.dict_of(value_spec, key_spec)
       return false
     end
     return dict.is_a(x, value_spec, key_spec)
+  end
+end
+
+function case.rules.re(...)
+  local pats = {...}
+
+  return function (x)
+    local ok, msg = is_string(x)
+    if not ok then
+      return ok, msg
+    end
+
+    return strmatch(x, unpack(pats))
   end
 end
 

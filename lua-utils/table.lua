@@ -44,7 +44,8 @@ function dict.filter_unless(x, f, mapper)
   for i, v in pairs(x) do
     if not f(i, v) then
       if mapper then
-        out[i] = mapper(v)
+        i, v = mapper(i, v)
+        out[i] = v
       else
         out[i] = v
       end
