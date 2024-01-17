@@ -301,6 +301,11 @@ function list.pop(x, pos)
   return y
 end
 
+function list.lpop(x)
+  return list.pop(x, 1)
+end
+
+
 --- Join list with a string
 --- @param x list
 --- @param sep string
@@ -1515,6 +1520,8 @@ end
 function list.lpush(x, y)
   return list.lappend(x, { y })
 end
+
+list.unshift = list.lpush
 
 function dict.merge2(x, y)
   return dict.merge(x, { y })
