@@ -1,4 +1,7 @@
+require 'lua-utils.copy'
+
 inspect = require "inspect"
+inspect = inspect.inspect
 dump = inspect
 
 --- @alias kv_pair { [1]: string|number, [2]: any }
@@ -336,6 +339,61 @@ function is_dict(x, skip_mtcheck)
   end
 end
 
+--- Create a namespace. It is possible to set metatable keys and retrieve them. Supports tostring()
+--- @return table
+function namespace(name)
+  local mod = {}
+  local mt = { __tostring = dump, type = "namespace", name = name }
+
+  function mt:__newindex(key, value)
+    if mtkeys[key] then
+      mt[key] = value
+    else
+      rawset(self, key, value)
+    end
+  end
+
+  function mt:__index(key)
+    if mtkeys[key] then
+      return mt[key]
+    end
+  end
+
+  function mod:get_module_name()
+    return self and mtget(self, "name") or name
+  end
+
+  function mod:include_module(other)
+    return dict.merge(mod, { other })
+  end
+
+  function mod:is_a()
+    return typeof(self) == "namespace" and self:get_module_name() == name
+  end
+
+  function mod:get_methods()
+    return dict.filter(self, function(_, value)
+      return is_callable(value)
+    end)
+  end
+
+  function mod:get_method(fn)
+    if not self[fn] then
+      return nil, "invalid method name " .. dump(fn)
+    end
+
+    return function(...)
+      return fn(self, ...)
+    end
+  end
+
+  function mod:get_module()
+    return self or mod
+  end
+
+  return setmetatable(mod, mt)
+end
+
 --- Is namespace?
 --- @param x any
 --- @return boolean,string?
@@ -343,25 +401,7 @@ function is_namespace(x)
   local ok = typeof(x) == "namespace"
 
   if not ok then
-    return false
-  end
-
-  return true
-end
-
-function is_instance(x, name)
-  local mt = getmetatable(x)
-
-  if not mt then
-    return false, "expected table with metatable, got " .. dump(x)
-  end
-
-  if not mt.type and not mt.class then
-    return false, "expected class instance, got " .. dump(x)
-  elseif name then
-    if mt.type ~= name then
-      return false, "expected class instance of type " .. name .. ", got " .. dump(x)
-    end
+    return false, 'expected namespace, got ' .. dump(x)
   end
 
   return true
@@ -567,131 +607,250 @@ function sameref(x, y)
   return ref(x) == ref(y)
 end
 
-asserttype = assert_is_a
-
 --------------------------------------------------
-function class(name, static)
-  static = static or {}
+class = namespace "class"
+
+local non_class_attribs = {
+  new = true,
+  init = true,
+  get_module_parent = true,
+  get_module = true,
+  get_module_name = true,
+  is_a = true,
+  include_module = true,
+  get_methods = true,
+  get_method = true,
+  get_attribs = true,
+  is_child_of = true,
+  is_parent_of = true,
+  super = true,
+}
+
+function is_class(self)
+  local ok, msg = is_namespace(self)
+
+  if not ok then
+    return false, msg
+  elseif not self.is_child_of then
+    return false, "namespace is not a class " .. dump(self)
+  end
+
+  return true
+end
+
+function instanceof(A, B)
+  if not is_class(A) then
+    return false, "expected class, got " .. dump(A)
+  end
+
+  if not is_class(B) then
+    return false, "expected class, got " .. dump(B)
+  end
+
+  local A_mod, B_mod = A:get_module(), B:get_module()
+  if A_mod == B_mod then
+    return true
+  elseif B:is_parent_of(A) then
+    return true
+  end
+
+  return false, string.format("expected child of %s, got %s", B:get_name(), dump(A))
+end
+
+function class.get_attribs(self, exclude_callables)
+  assert_is_a.class(self)
+
+  return dict.filter(self, function(key, value)
+    if exclude_callables and is_callable(value) then
+      return false
+    end
+    return not non_class_attribs[key]
+  end)
+end
+
+function class.get_module_parent(self)
+  return mtget(self, "parent")
+end
+
+function class.is_child_of(self, other)
+  local ok, msg
+
+  ok, msg = is_class(self)
+  if not ok then
+    return false, msg
+  end
+
+  ok, msg = is_class(other)
+  if not ok then
+    return false, msg
+  end
+
+  local other_mod = other.get_module()
+  local self_parent = self:get_module_parent()
+
+  if self_parent == other_mod then
+    return self
+  elseif not self_parent then
+    return nil, "no parent defined for " .. dump(self)
+  end
+
+  while self_parent ~= other_mod do
+    self_parent = self_parent:get_module_parent()
+    if not self_parent then
+      return nil, "no parent defined for " .. dump(self)
+    end
+  end
+
+  return self
+end
+
+function class.is_parent_of(self, other)
+  return class.is_child_of(other, self)
+end
+
+function class.is_a(self, other)
+  if is_nil(other) then
+    return is_class(self)
+  end
+
+  local ok, msg = is_class(self)
+  if not ok then
+    return false, msg
+  end
+
+  return class.is_child_of(other, self)
+end
+
+function class:new(name, static, opts)
+  opts = opts or {}
+  local classmod = namespace(name)
+  local classmodmt = mtget(classmod)
+  local parent = opts.parent
+  static = copy(static or {})
+  classmodmt.static = static
+
+  if static then
+    assert_is_a.table(static)
+  end
 
   if static[1] then
-    for i = 1, #static do
+    for i=1, #static do
       static[static[i]] = true
-      static[i] = nil
     end
   end
 
-  if not is_string(name) then
-    error("expected string, got " .. type(name))
+  classmod.is_a = class.is_a
+  classmod.is_child_of = class.is_child_of
+  classmod.is_parent_of = class.is_parent_of
+
+  dict.merge2(classmod, class)
+
+  if parent then
+    assert_is_a.class(parent)
+    classmodmt.parent = parent
   end
 
-  local mod = {}
-  local modmt = { type = "classmod", __tostring = dump }
-  local classmt = { type = name, __tostring = dump }
-
-  setmetatable(mod, modmt)
-
-  function modmt:__call(...)
-    local obj = mtset({}, classmt)
-    static = static or {}
-
-    for key, value in pairs(self) do
-      if not static[key] then
-        obj[key] = value
-      end
-    end
-
-    local init = rawget(mod, "init")
-    if init then
-      return init(obj, ...)
-    end
-
-    return obj
-  end
-
-  function modmt:__newindex(key, value)
+  function classmodmt:__newindex(key, value)
     if mtkeys[key] then
-      modmt[key] = value
-      classmt[key] = value
+      classmodmt[key] = value
     else
       rawset(self, key, value)
     end
   end
 
-  modmt.__index = modmt
-  classmt.__index = classmt
-
-  function mod.is_a(self)
-    if not is_table(self) then
-      return false
+  function classmodmt:__index(key)
+    if class[key] then
+      return class[key]
     end
 
-    local mt = getmetatable(self)
-    if not mt then
-      return false
-    elseif not mt.type then
-      return false
-    elseif mt.type ~= name then
-      return false
-    end
-
-    return true
-  end
-
-  function mod.assert_is_a(self)
-    if not mod.is_a(self) then
-      error("expected " .. name .. ", got " .. dump(self))
-    end
-
-    return self
-  end
-
-  function mod:include(other)
-    if not is_table(other) then
-      return
-    end
-
-    for key, value in pairs(other) do
-      self[key] = value
-    end
-
-    return self
-  end
-
-  function mod.get_classmod()
-    return mod
-  end
-
-  function mod.get_module_name()
-    return name
-  end
-
-  function mod:get_methods()
-    return dict.filter(self, function(_, value)
-      return is_callable(value)
-    end)
-  end
-
-  function mod:create_instance_method(fn)
-    assert_is_a(fn, union('string', 'callable'))
-
-    if is_string(fn) then
-      return self:get_method(fn)
-    end
-
-    return function(...)
-      return fn(self, ...)
+    local parent = self:get_module_parent()
+    if parent then
+      return parent[key]
     end
   end
 
-  function mod:get_method(fun)
-    local ok = self[fun]
+  function classmod:get_module()
+    return self or classmod
+  end
 
-    if not ok then
-      return nil, 'invalid method name: ' .. dump(fun)
+  function classmod:get_module_parent()
+    return mtget(self, "parent") or parent
+  end
+
+  function classmod.super(self, ...)
+    local parent = self:get_module_parent()
+
+    if not parent then
+      return obj
+    elseif parent.init then
+      return parent.init(self, ...)
+    end
+
+    local init
+    local gp
+
+    while not init do
+      gp = parent:get_module_parent()
+
+      if not gp then
+        error("no .init() defined for " .. dump(self))
+      end
+
+      init = gp.init
+    end
+
+    return init(self, ...)
+  end
+
+  local objmt = {type = name, __tostring = dump}
+
+  function objmt:__index(key)
+    local ok = classmod[key]
+    if ok then return ok end
+
+    local parent = self:get_module_parent()
+    if parent then return parent[key] end
+  end
+
+  function objmt:__newindex(key, value)
+    if mtkeys[key] then
+      overload(self, key, value)
     else
-      return ok
+      rawset(self, key, value)
     end
   end
 
-  return mod
+  function classmod:get_static_methods()
+    return mtget(self, 'static')
+  end
+
+  function classmod:new(...)
+    local obj = mtset({}, objmt)
+    dict.merge2(obj, classmod)
+
+    local static = self:get_static_methods()
+
+    for key, value in pairs(classmod) do
+      if not static[key] then
+        obj[key] = value
+      end
+    end
+
+    local init = self.init
+
+    obj.new = nil
+    local init = obj.init
+
+    if init then
+      return init(obj, ...)
+    else
+      return obj:super(...)
+    end
+  end
+
+  classmodmt.__call = classmod.new
+
+  return classmod
 end
+
+class.__call = class.new

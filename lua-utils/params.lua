@@ -75,7 +75,7 @@ local function _claim(x, y, levelname)
     elseif is_table(b) then
       error(levelname .. "." .. key .. ": expected table, got " .. dump(a))
     else
-      asserttype(b, union("string", "function"))
+      assert_is_a(b, union("string", "function"))
 
       b = is_string(b) and union(b) or b
       local ok, msg = b(a)

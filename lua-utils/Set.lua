@@ -31,7 +31,7 @@ function Set.is_set(x)
 end
 
 function Set:__call(x)
-  asserttype(x, "table")
+  assert_is_a(x, "table")
 
   if Set.is_set(x) then
     return x
