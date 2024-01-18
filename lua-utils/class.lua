@@ -17,35 +17,22 @@ local non_class_attribs = {
   is_parent_of = true,
 }
 
-function is_instance(self)
-  local ok, msg = is_table(self)
+function is_instance(x)
+  local ok, msg = is_table(x)
   if not ok then
-    return msg
+    return false, msg
   end
 
-  local mt = mtget(self)
+  local mt = mtget(x)
   if not mt then
-    return false, "no metatable " .. dump(self)
-  elseif not is_string(mt.type) then
-    return false, "not a type: " .. dump(self)
-  else
-    local mod = self:get_module()
-    if not mod then
-      return false, "no class constructor defined for instance " .. dump(self)
-    else
-      local ok, msg = is_namespace(mod)
-      if not ok then
-        return false, msg
-      else
-        ok = mod:get_module_name()
-        if not ok then
-          return false, "expected class namespace, got " .. dump(self)
-        end
-      end
-    end
+    return false, 'missing metatable ' .. dump(x)
+  elseif not is_string(x) then
+    return false, 'not a type ' .. dump(x)
+  elseif not x.get_module then
+    return false, 'invalid class without module ' .. dump(x)
   end
 
-  return self
+  return x
 end
 
 function is_class(self)
@@ -55,6 +42,8 @@ function is_class(self)
     return false, msg
   elseif not self.is_child_of then
     return false, "namespace is not a class " .. dump(self)
+  elseif is_instance(self) then
+    return false, 'expected class, got instance ' .. dump(self)
   end
 
   return true
@@ -81,6 +70,7 @@ end
 
 function class.get_attribs(self, exclude_callables)
   assert_is_a.class(self)
+
   return dict.filter(self, function(key, value)
     if exclude_callables and is_callable(value) then
       return false
@@ -160,15 +150,16 @@ function class:new(name, static, opts)
   end
 
   function classmod:get_module()
-    return classmod
+    return self or classmod
   end
 
   function classmod:get_module_parent()
-    return mtget(self, "parent")
+    return mtget(self, "parent") or parent
   end
 
   function classmod:super(...)
     local parent = self:get_module_parent()
+
     if not parent then
       return self
     elseif parent.init then
@@ -203,6 +194,7 @@ function class:new(name, static, opts)
   end
 
   classmod.__call = classmod.new
+  classmodmt.parent = parent
 
   return classmod
 end

@@ -122,7 +122,7 @@ end
 --- @return table
 function namespace(name)
   local mod = {}
-  local mt = { __tostring = dump, type = "namespace" }
+  local mt = { __tostring = dump, type = "namespace", name = name }
 
   function mt:__newindex(key, value)
     if mtkeys[key] then
@@ -138,16 +138,17 @@ function namespace(name)
     end
   end
 
-  function mod.get_module_name()
-    return name
+  function mod:get_module_name()
+    return self and mtget(self, 'name') or name
   end
 
-  function mod:include(other)
+  function mod:include_module(other)
     return dict.merge(mod, { other })
   end
 
+
   function mod:is_a()
-    return typeof(self) == "namespace" and self.get_name() == name
+    return typeof(self) == "namespace" and self.get_module_name() == name
   end
 
   function mod:get_methods()
@@ -156,10 +157,18 @@ function namespace(name)
     end)
   end
 
-  function mod:to_callable(fn)
+  function mod:get_method(fn)
+    if not self[fn] then
+      return nil, 'invalid method name ' .. dump(fn)
+    end
+
     return function(...)
       return fn(self, ...)
     end
+  end
+
+  function mod:get_module()
+    return self or mod
   end
 
   return setmetatable(mod, mt)
