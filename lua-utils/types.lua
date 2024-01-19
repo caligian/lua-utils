@@ -1,4 +1,4 @@
-require 'lua-utils.copy'
+require "lua-utils.copy"
 
 inspect = require "inspect"
 inspect = inspect.inspect
@@ -46,9 +46,10 @@ function mtget(obj, k)
     return
   end
 
-  if k then
+  if k ~= nil then
     return mt[k]
   end
+
   return mt
 end
 
@@ -57,15 +58,26 @@ end
 --- @param k any if v is nil then set k as metatable else retrieve key
 --- @param v? any value to set
 --- @return any
-function mtset(obj, k, v)
-  if v == nil then
-    return setmetatable(obj, k)
+function mtset(...)
+  local n = select("#", ...)
+  local args = { ... }
+  x = args[1]
+
+  if n == 1 then
+    error("need at least 2 params, got " .. n)
+  elseif n == 2 then
+    local mt = args[2]
+    if type(mt) ~= "table" then
+      return
+    end
+
+    return setmetatable(x, mt)
   end
 
-  local mt = getmetatable(obj) or {}
-  mt[k] = v
+  local mt = getmetatable(x) or {}
+  mt[args[2]] = args[3]
 
-  return setmetatable(obj, mt)
+  return setmetatable(x, mt)
 end
 
 --- @param x any
@@ -360,15 +372,11 @@ function namespace(name)
   end
 
   function mod:get_module_name()
-    return self and mtget(self, "name") or name
+    return mtget(self, "name")
   end
 
   function mod:include_module(other)
     return dict.merge(mod, { other })
-  end
-
-  function mod:is_a()
-    return typeof(self) == "namespace" and self:get_module_name() == name
   end
 
   function mod:get_methods()
@@ -401,15 +409,31 @@ function is_namespace(x)
   local ok = typeof(x) == "namespace"
 
   if not ok then
-    return false, 'expected namespace, got ' .. dump(x)
+    return false, "expected namespace, got " .. dump(x)
   end
 
-  return true
+  return x
+end
+
+function is_class(self)
+  local ok = typeof(self)
+
+  if ok ~= "class" then
+    return false, "expected class, got " .. dump(self)
+  end
+
+  return self
+end
+
+function is_instance(self)
+  return mtget(self, "instance") and self
 end
 
 function is_literal(x)
   return is_string(x) or is_number(x) or is_boolean(x)
 end
+
+---
 
 --- Return a function that checks union of types ...
 --- @param ... string|function|table
@@ -425,8 +449,11 @@ function union(...)
       local current_sig = sig[i]
       local sig_type = type(sig[i])
       local sig_name = typeof(sig[i])
+      local instance = mtget(current_sig, "instance")
 
-      if current_sig == "list" then
+      if current_sig == "*" or current_sig == "any" then
+        return true
+      elseif current_sig == "list" then
         if not is_list(x) then
           failed[#failed + 1] = "list"
         end
@@ -443,8 +470,12 @@ function union(...)
       elseif is_table(current_sig) then
         if not is_table(x) then
           failed[#failed + 1] = "table"
-        else
-          return sig_name == x_type
+        elseif sig_name == "class" or instance then
+          if not current_sig:is_a(x) and not current_sig:is_parent_of(x) then
+            failed[#failed + 1] = sig_name
+          end
+        elseif sig_name ~= x_type then
+          failed[#failed + 1] = sig_name
         end
       elseif is_function(current_sig) then
         local ok, msg = current_sig(x)
@@ -484,37 +515,10 @@ is_a_mt.__index = is_a_mt
 setmetatable(is_a, is_a_mt)
 
 function is_a_mt:__index(key)
-  if key == "*" or key == "any" then
-    return function()
-      return true
-    end
+  local f = union(key)
+  return function(x)
+    return f(x)
   end
-
-  if is_function(key) then
-    return key
-  end
-
-  local key_type = not is_string(key) and typeof(key) or key
-  local _, times = key_type:gsub("%?$", "")
-  local optional = times > 0
-
-  local Gfun = _G["is_" .. key]
-    or function(x)
-      local x_type = typeof(x)
-      if x_type == nil and optional then
-        return true
-      elseif x_type ~= key then
-        return false, ("expected " .. key_type .. ", got " .. x_type)
-      end
-
-      return x
-    end
-
-  if not rawget(self, key) then
-    rawset(self, key, Gfun)
-  end
-
-  return Gfun
 end
 
 function is_a_mt:__call(obj, expected, assert_type)
@@ -626,38 +630,7 @@ local non_class_attribs = {
   super = true,
 }
 
-function is_class(self)
-  local ok, msg = is_namespace(self)
-
-  if not ok then
-    return false, msg
-  elseif not self.is_child_of then
-    return false, "namespace is not a class " .. dump(self)
-  end
-
-  return true
-end
-
-function instanceof(A, B)
-  if not is_class(A) then
-    return false, "expected class, got " .. dump(A)
-  end
-
-  if not is_class(B) then
-    return false, "expected class, got " .. dump(B)
-  end
-
-  local A_mod, B_mod = A:get_module(), B:get_module()
-  if A_mod == B_mod then
-    return true
-  elseif B:is_parent_of(A) then
-    return true
-  end
-
-  return false, string.format("expected child of %s, got %s", B:get_name(), dump(A))
-end
-
-function class.get_attribs(self, exclude_callables)
+function class:get_attribs(exclude_callables)
   assert_is_a.class(self)
 
   return dict.filter(self, function(key, value)
@@ -668,57 +641,67 @@ function class.get_attribs(self, exclude_callables)
   end)
 end
 
-function class.get_module_parent(self)
+function class:get_module_parent()
   return mtget(self, "parent")
 end
 
-function class.is_child_of(self, other)
-  local ok, msg
+local check_type = function(x)
+  return is_class(x) or is_instance(x)
+end
 
-  ok, msg = is_class(self)
-  if not ok then
-    return false, msg
+function class:is_child_of(other)
+  if not check_type(self) then
+    return
   end
 
-  ok, msg = is_class(other)
-  if not ok then
-    return false, msg
+  local check_name = check_type(other) or is_string(other)
+  if not check_name then
+    return
   end
 
-  local other_mod = other.get_module()
+  check_name = not is_string(other) and other:get_module_name() or other
   local self_parent = self:get_module_parent()
+  local self_parent_name
 
-  if self_parent == other_mod then
-    return self
-  elseif not self_parent then
-    return nil, "no parent defined for " .. dump(self)
+  if not self_parent then
+    return
+  else
+    self_parent_name = self_parent:get_module_name()
   end
 
-  while self_parent ~= other_mod do
+  while self_parent_name ~= check_name do
     self_parent = self_parent:get_module_parent()
     if not self_parent then
-      return nil, "no parent defined for " .. dump(self)
+      return
+    else
+      self_parent_name = self_parent:get_module_name()
     end
   end
 
   return self
 end
 
-function class.is_parent_of(self, other)
+function class:is_parent_of(other)
   return class.is_child_of(other, self)
 end
 
-function class.is_a(self, other)
-  if is_nil(other) then
-    return is_class(self)
+function class:is_a(other)
+  local check = function(x)
+    return check_type(x) or is_string(x)
   end
 
-  local ok, msg = is_class(self)
+  if not check(other) then
+    return
+  elseif not is_string(other) then
+    other = other:get_module_name()
+  end
+
+  local ok = self:get_module_name() == other
   if not ok then
-    return false, msg
+    return self:is_child_of(other)
   end
 
-  return class.is_child_of(other, self)
+  return self
 end
 
 function class:new(name, static, opts)
@@ -728,13 +711,21 @@ function class:new(name, static, opts)
   local parent = opts.parent
   static = copy(static or {})
   classmodmt.static = static
+  classmodmt.type = "class"
+  classmodmt.parent = parent
 
   if static then
     assert_is_a.table(static)
   end
+  local exclude = {
+    get_super_method = true,
+    super = true,
+    new = true,
+    init = true,
+  }
 
   if static[1] then
-    for i=1, #static do
+    for i = 1, #static do
       static[static[i]] = true
     end
   end
@@ -742,6 +733,7 @@ function class:new(name, static, opts)
   classmod.is_a = class.is_a
   classmod.is_child_of = class.is_child_of
   classmod.is_parent_of = class.is_parent_of
+  classmodmt.module = classmod
 
   dict.merge2(classmod, class)
 
@@ -770,81 +762,96 @@ function class:new(name, static, opts)
   end
 
   function classmod:get_module()
-    return self or classmod
+    return mtget(self, "module")
   end
 
   function classmod:get_module_parent()
-    return mtget(self, "parent") or parent
+    return mtget(self, "parent")
   end
 
-  function classmod.super(self, ...)
+  function classmod:get_module_name()
+    return mtget(self, "name")
+  end
+
+  function classmod:get_super_method()
     local parent = self:get_module_parent()
 
-    if not parent then
-      return obj
-    elseif parent.init then
-      return parent.init(self, ...)
-    end
-
-    local init
-    local gp
-
-    while not init do
-      gp = parent:get_module_parent()
-
-      if not gp then
-        error("no .init() defined for " .. dump(self))
+    while parent do
+      local init = parent.init
+      if init then
+        return init
       end
 
-      init = gp.init
+      parent = parent:get_module_parent()
     end
 
-    return init(self, ...)
+    error('no init defined for ' .. dump(self))
   end
 
-  local objmt = {type = name, __tostring = dump}
+  function classmod:super(obj, ...)
+    local super_fn = self:get_super_method()
+    return super_fn(obj, ...)
+  end
+
+  local objmt = { type = name, __tostring = dump, instance = true, module = classmod }
 
   function objmt:__index(key)
+    if key == 'super' or key == 'get_super_method' then
+      return
+    end
+
     local ok = classmod[key]
-    if ok then return ok end
+    if ok then
+      return ok
+    end
 
     local parent = self:get_module_parent()
-    if parent then return parent[key] end
+    if parent then
+      return parent[key]
+    end
   end
 
   function objmt:__newindex(key, value)
     if mtkeys[key] then
-      overload(self, key, value)
+      objmt[key] = value
     else
       rawset(self, key, value)
     end
   end
 
   function classmod:get_static_methods()
-    return mtget(self, 'static')
+    return mtget(self, "static")
   end
 
   function classmod:new(...)
     local obj = mtset({}, objmt)
-    dict.merge2(obj, classmod)
 
+    dict.merge2(obj, classmod)
     local static = self:get_static_methods()
 
     for key, value in pairs(classmod) do
-      if not static[key] then
+      if not static[key] and not exclude[key] then
         obj[key] = value
       end
     end
 
+    function obj:get_module()
+      return mtget(self, 'module')
+    end
+
+    function obj.get_module_parent()
+      return classmod:get_module_parent()
+    end
+
+    function obj.get_module_name()
+      return classmod:get_module_name()
+    end
+
     local init = self.init
-
-    obj.new = nil
-    local init = obj.init
-
     if init then
       return init(obj, ...)
     else
-      return obj:super(...)
+      return self:super(obj, ...)
     end
   end
 
