@@ -835,16 +835,8 @@ function class:new(name, static, opts)
       end
     end
 
-    function obj:get_module()
-      return mtget(self, 'module')
-    end
-
-    function obj.get_module_parent()
-      return classmod:get_module_parent()
-    end
-
-    function obj.get_module_name()
-      return classmod:get_module_name()
+    function obj:get_module_name()
+      return mtget(self, 'type')
     end
 
     local init = self.init
