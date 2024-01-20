@@ -631,8 +631,6 @@ local non_class_attribs = {
 }
 
 function class:get_attribs(exclude_callables)
-  assert_is_a.class(self)
-
   return dict.filter(self, function(key, value)
     if exclude_callables and is_callable(value) then
       return false
@@ -717,6 +715,7 @@ function class:new(name, static, opts)
   assert_is_a.table(static)
 
   local exclude = {
+    get_static_methods = true,
     get_super_method = true,
     super = true,
     new = true,
@@ -773,15 +772,15 @@ function class:new(name, static, opts)
   end
 
   function classmod:get_super_method()
-    local parent = self:get_module_parent()
+    local _parent = self:get_module_parent()
 
-    while parent do
-      local init = parent.init
+    while _parent do
+      local init = _parent.init
       if init then
         return init
       end
 
-      parent = parent:get_module_parent()
+      _parent = _parent:get_module_parent()
     end
 
     error('no init defined for ' .. dump(self))
@@ -792,7 +791,7 @@ function class:new(name, static, opts)
     return super_fn(obj, ...)
   end
 
-  local objmt = { type = name, __tostring = dump, instance = true, module = classmod }
+  local objmt = { type = name, __tostring = dump, instance = true, module = classmod, static = static }
 
   function objmt:__index(key)
     if key == 'super' or key == 'get_super_method' then
@@ -804,9 +803,9 @@ function class:new(name, static, opts)
       return ok
     end
 
-    local parent = self:get_module_parent()
-    if parent then
-      return parent[key]
+    local _parent = self:get_module_parent()
+    if _parent then
+      return _parent[key]
     end
   end
 
@@ -824,12 +823,10 @@ function class:new(name, static, opts)
 
   function classmod:new(...)
     local obj = mtset({}, objmt)
-
-    dict.merge2(obj, classmod)
-    local static = self:get_static_methods()
+    local static_methods = self:get_static_methods()
 
     for key, value in pairs(classmod) do
-      if not static[key] and not exclude[key] then
+      if not static_methods[key] and not exclude[key] then
         obj[key] = value
       end
     end
