@@ -714,9 +714,8 @@ function class:new(name, static, opts)
   classmodmt.type = "class"
   classmodmt.parent = parent
 
-  if static then
-    assert_is_a.table(static)
-  end
+  assert_is_a.table(static)
+
   local exclude = {
     get_super_method = true,
     super = true,
