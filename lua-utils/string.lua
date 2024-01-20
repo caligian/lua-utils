@@ -4,147 +4,88 @@ require "lua-utils.table"
 
 substr = string.sub
 
-local function pat_split(x, sep, opts)
+function strfind(x, sep, opts)
   opts = opts or {}
   local max = opts.max
+  local plain = opts.plain
+  local escaped = opts.escaped or opts.ignore_escaped
+  local capture = opts.capture
   local results = {}
-  local len = 0
   local init = opts.init or 1
+  local results_len = 0
 
-  while init do
-    local next_sep = { string.find(x, sep, init) }
+  local function get_next_sep(start_from)
+    local next_sep = {string.find(x, sep, start_from, plain)}
 
     if #next_sep == 0 then
-      break
-    elseif max and len == max then
-      break
-    else
-      local word = x:sub(init, next_sep[1] - 1)
-      init = next_sep[2] + 1
-      results[len + 1] = word
-      len = len + 1
+      return
+    elseif escaped then
+      local last_pos = next_sep[2]-1
+      local last_char = x:sub(last_pos, last_pos)
+
+      if last_char == "\\" then
+        return get_next_sep(next_sep[2]+1)
+      end
     end
+
+    if capture then
+      next_sep[3] = x:sub(unpack(next_sep))
+    end
+
+    return next_sep
   end
 
-  if #results == 0 then
-    return { x }
-  else
-    if max and max == len then
+  local function findall(start_from)
+    if max and max == results_len then
       return results
     end
 
-    results[len + 1] = x:sub(init, #x)
-    return results
+    local next_sep = get_next_sep(start_from)
+    if not next_sep then
+      return results
+    else
+      results_len = results_len + 1
+      results[results_len] = next_sep
+    end
+
+    return findall(next_sep[2]+1)
   end
+
+  return findall(init)
 end
 
---- Split string
---- @overload fun(x: string, sep: string, maxtimes: number): string[]
 function strsplit(x, sep, opts)
-  assert(type(x) == "string", "needed string, got " .. tostring(x))
-  assert(type(sep) == "string", "needed string, got " .. tostring(sep))
-
-  if sep == "" then
-    local out = {}
-    for i = 1, #x do
-      out[i] = x:sub(i, i)
-    end
-
-    return out
-  end
+	if sep == "" then
+		local out = {}
+		for i=1, #x do
+			out[i] = x:sub(i, i)
+		end
+		return out
+	end
 
   opts = opts or {}
-  if opts.pattern then
-    opts.ignore_escaped = false
-  end
-
-  if opts.ignore_escaped then
-    opts.pattern = false
-  end
-
-  if (not opts.pattern and not opts.ignore_escaped) or opts.pattern then
-    return pat_split(x, sep, opts)
-  end
-
-  local init = opts.init
-  local max = opts.max
-  local ignore_escaped = opts.ignore_escaped
-  local word = ignore_escaped and string.format("[^%s]+|\\%s+", sep, sep)
-  local pos = opts.pos
-  init = init or 1
-  local lpeg = require "lpeg"
-  local sep_pat = lpeg.P(sep)
-
-  local function match_seps_only(init_from)
-    local pat = lpeg.C(sep_pat ^ 1) * lpeg.Cp()
-    local matched, next_pos = pat:match(x, init_from)
-
-    if not matched then
-      return
-    end
-
-    len = #matched
-    if len > 0 then
-      return len - 1, next_pos
-    end
-  end
-
-  local function get_next(init_from, results)
-    local len = #results
-
-    if max and len == max then
-      return
-    end
-
-    init_from = init_from or 1
-    local full_word, next_init
-    local word
-    local pat
-    local extra_sep, new_init = match_seps_only(init_from, 0)
-    local found, next_init
-
-    if extra_sep then
-      if max and len + extra_sep > max then
-        extra_sep = (len + extra_sep) - max
-      end
-
-      for i = 1, extra_sep do
-        results[#results + 1] = ""
-      end
-
-      return new_init
-    end
-
-    if ignore_escaped then
-      local escaped = lpeg.P("\\" .. sep)
-      local new_sep = lpeg.B(1 - escaped) * sep_pat
-      word = ((1 - new_sep) + escaped)
-      pat = lpeg.C(word ^ 1 * word ^ 0) * lpeg.Cp()
-    else
-      word = (1 - sep_pat)
-      pat = lpeg.C(word ^ 1) * lpeg.Cp()
-    end
-
-    found, next_init = pat:match(x, init_from or 1)
-    if found then
-      results[#results + 1] = found
-      return next_init
-    end
-  end
-
   local results = {}
-  next_init = get_next(init, results)
+  local pos = strfind(x, sep, opts)
 
-  if not next_init then
-    return { x }
+  if #pos == 0 then
+    return {x}
   end
 
-  while next_init do
-    next_init = get_next(next_init, results)
+  local init = opts.init or 1
+  for i=1, #pos do
+    local word = x:sub(init, pos[i][1]-1)
+    init = pos[i][2] + 1
+    results[#results+1] = word
+  end
+
+  local len = #x
+  if init ~= len then
+    results[#results+1] = x:sub(init, len)
   end
 
   return results
 end
+
 
 --- Matching multiple patterns
 --- @param x string
@@ -159,43 +100,6 @@ function strmatch(x, ...)
       return found
     end
   end
-end
-
---- Get start and ending index of a matched pattern
---- @param x string
---- @param pattern string
---- @param init? number initial position (default: 1)
---- @param times? number number of times. -1 to get all matches (default: -1)
---- @return number[]|nil
-function strfind(x, pattern, init, times)
-  init = init or 1
-  local a, b = init, 1
-  local len = #x
-  local res = {}
-  local n = 0
-  times = times or -1
-
-  while a <= len do
-    if times ~= -1 and n > times then
-      break
-    end
-
-    a, b = x:find(pattern, a)
-
-    if a then
-      list.append(res, { { a, b } })
-      a = b + 1
-      n = n + 1
-    else
-      break
-    end
-  end
-
-  if #res == 0 then
-    return
-  end
-
-  return res
 end
 
 --- Check if string is ^[a-zA-Z_][0-9a-zA-Z_]*$

@@ -702,7 +702,7 @@ function class:is_a(other)
   return self
 end
 
-function class:new(name, static, opts)
+function class:__call(name, static, opts)
   opts = opts or {}
   local classmod = namespace(name)
   local classmodmt = mtget(classmod)
@@ -733,7 +733,7 @@ function class:new(name, static, opts)
   classmod.is_parent_of = class.is_parent_of
   classmodmt.module = classmod
 
-  dict.merge2(classmod, class)
+  dict.merge2(classmod, cls)
 
   if parent then
     assert_is_a.class(parent)
@@ -821,7 +821,7 @@ function class:new(name, static, opts)
     return mtget(self, "static")
   end
 
-  function classmod:new(...)
+  function classmod:__call(...)
     local obj = mtset({}, objmt)
     local static_methods = self:get_static_methods()
 
@@ -843,9 +843,5 @@ function class:new(name, static, opts)
     end
   end
 
-  classmodmt.__call = classmod.new
-
   return classmod
 end
-
-class.__call = class.new
