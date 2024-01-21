@@ -3,279 +3,226 @@ require "lua-utils.table"
 --- dictionary based set
 --- Other support operators:
 --- > == (exactly equal), ~= (unequal), < (subset), > (superset)
---- @class Set : table
+--- @class Set
 --- @operator add(Set | list):Set union
 --- @operator sub(Set | list):Set difference
 --- @operator pow(Set | list):Set intersection
+Set = namespace 'Set'
 
-Set = namespace()
+function Set.size(self)
+  return size(self)
+end
 
-local Setmt = {
-  type = "Set",
-  __tostring = function(x)
-    return dump(copy(x))
-  end,
+function Set.difference(self, y)
+  if typeof(y) ~= "Set" then
+    self = copy(self)
+    self[y] = nil
+
+    return self
+  end
+
+  self = copy(self)
+  for value, _ in pairs(y) do
+    self[value] = nil
+  end
+
+  return self
+end
+
+function Set.intersection(self, y)
+  assert_is_a.Set(y)
+
+  self = copy(self)
+
+  for value, _ in pairs(self) do
+    if not y[value] then
+      self[value] = nil
+    end
+  end
+
+  for value, _ in pairs(y) do
+    if not self[value] then
+      self[value] = nil
+    end
+  end
+
+  return self
+end
+
+function Set.add(self, y)
+  if not is_table(y) then
+    self = copy(self)
+    self[y] = true
+
+    return self
+  end
+
+  assert_is_a.Set(y)
+
+  self = copy(self)
+  for value, _ in pairs(y) do
+    self[value] = true
+  end
+
+  return self
+end
+
+function Set.union(self, y)
+  if not is_table(y) then
+    self = copy(self)
+    self[y] = true
+
+    return self
+  end
+
+  assert_is_a.Set(y)
+
+  self = copy(self)
+  for value, _ in pairs(y) do
+    self[value] = true
+  end
+
+  return self
+end
+
+
+function Set.eq(self, other)
+  assert_is_a.Set(other)
+
+  for value, _ in pairs(other) do
+    if not self[value] then
+      return false
+    end
+  end
+
+  return true
+end
+
+function Set.ne(other)
+  assert_is_a.Set(other)
+
+  for value, _ in pairs(other) do
+    if self[value] then
+      return false
+    end
+  end
+
+  return true
+end
+
+Set.filter = function (self, f, mapper)
+  return list.filter(keys(self), f, mapper)
+end
+
+Set.map = function (self, f)
+  return list.map(keys(self), f)
+end
+
+Set.reduce = function (self, f)
+  local elems = keys(self)
+  return list.reduce(elems, elems[1], f)
+end
+
+function Set.superset(x, y)
+  assert_is_a.Set(y)
+  return Set.size(x - y) == 0 and Set.size(x) >= Set.size(y) and x
+end
+
+function Set.subset(x, y)
+  return Set.superset(y, x)
+end
+
+function Set.strict_superset(x, y)
+  assert_is_a.Set(y)
+  return Set.size(x - y) == 0 and Set.size(x) > Set.size(y) and x
+end
+
+function Set.strict_subset(x, y)
+  return _Set.strict_superset(y, x)
+end
+
+function Set.items(self)
+  return keys(self)
+end
+
+--------------------------------------------------
+local mt = { 
+  type = 'Set', 
+  __eq = Set.eq,
+  __ne = Set.ne,
+  __concat = Set.add,
+  __add = Set.union,
+  __sub = Set.difference,
+  __pow = Set.intersection,
+  __div = Set.filter,
+  __mod = Set.map,
+  __mul = Set.reduce,
+  __le = Set.subset,
+  __lt = Set.strict_subset,
+  __gt = Set.strict_superset,
+  __ge = Set.superset,
 }
 
---- Get set items
---- @param x table|Set
---- @return table
-function Set.items(x)
-  return keys(Set(x))
-end
-
---- @param x Set
---- @return boolean
-function Set.is_set(x)
-  return mtget(x, "type") == "Set"
-end
-
-function Set:__call(x)
-  assert_is_a(x, "table")
-
-  if Set.is_set(x) then
-    return x
+function Set:__call(tbl)
+  if typeof(tbl) == 'Set' then
+    return tbl
   end
 
-  x = dict.from_list(x)
-  mtset(x, Setmt)
+  --- @type Set
+  local obj = dict.from_list(tbl, function () return true end)
+  mtset(obj, mt)
 
-  return x
+  return obj
 end
 
-function Setmt:__add(y)
-  if not is_table(y) then
-    self = Set(copy(self))
-    self[y] = nil
+--------------------------------------------------
 
-    return self
-  end
-
-  y = Set(y)
-  local out = copy(self)
-
-  for key, _ in pairs(y) do
-    out[key] = true
-  end
-
-  return Set(keys(out))
-end
-
-function Setmt:__pow(y)
-  y = Set(y)
-  local out = copy(self)
-
-  for value, _ in pairs(out) do
-    if not y[value] then
-      out[value] = nil
-    end
-  end
-
-  return Set(keys(out))
-end
-
-function Setmt:__mod(f)
-  return Set(list.map(keys(self), f))
-end
-
-function Setmt:__div(f)
-  return Set(list.filter(keys(self), f))
-end
-
-function Setmt:__sub(y)
-  if not is_table(y) then
-    self = copy(Set(self))
-    self[y] = nil
-    return self
-  end
-
-  y = Set(y)
-  local out = copy(self)
-
-  for value, _ in pairs(y) do
-    out[value] = nil
-  end
-
-  return Set(keys(out))
-end
-
-function Setmt:__eq(y)
-  y = Set(y)
-  local out = copy(self)
-
-  for value, _ in pairs(y) do
-    if not out[value] then
-      return false
-    end
-  end
-
-  return size(out) == size(y) and Set(keys(out)) or false
-end
-
-function Setmt:__le(y)
-  y = Set(y)
-  local out = copy(self)
-
-  for value, _ in pairs(out) do
-    if not y[value] then
-      return false
-    end
-  end
-
-  return size(out) <= size(y)
-end
-
-function Setmt:__lt(y)
-  y = Set(y)
-  local out = copy(self)
-
-  for value, _ in pairs(out) do
-    if not y[value] then
-      return false
-    end
-  end
-
-  return size(out) < size(y)
-end
-
-function Setmt:__ne(y)
-  return not Setmt:__eq(y)
-end
-
-function Setmt:__ge(y)
-  y = Set(y)
-  local out = copy(self)
-
-  for value, _ in pairs(y) do
-    if not out[value] then
-      return false
-    end
-  end
-
-  return size(out) >= size(y)
-end
-
-function Setmt:__gt(y)
-  y = Set(y)
-  local out = copy(self)
-
-  for value, _ in pairs(y) do
-    if not out[value] then
-      return false
-    end
-  end
-
-  return size(out) > size(y)
-end
-
---- Set union
---- @param x Set|table
---- @param y Set|table
---- @return Set
-function Set.union(x, y)
-  return Set(x) + Set(y)
-end
-
---- Set intersection
---- @param x Set|table
---- @param y Set|table
---- @return Set
-function Set.intersection(x, y)
-  return Set(x) ^ Set(y)
-end
-
---- Set difference
---- @param x Set|table
---- @param y Set|table
---- @return Set
-function Set.difference(x, y)
-  return Set(x) - Set(y)
-end
-
---- Is x superset of y
---- @param x Set|table
---- @param y Set|table
---- @return boolean|Set
-function Set.superset(x, y)
-  return Set(x) >= Set(y) and x or false
-end
-
---- Is x subset of y
---- @param x Set|table
---- @param y Set|table
---- @return Set|boolean
-function Set.subset(x, y)
-  return Set(x) <= Set(y) and x or false
-end
-
---- Are sets exactly equal?
---- @param x table|Set
---- @param y table|Set
---- @return Set|boolean
-function Set.eq(x, y)
-  return Set(x) == Set(y) and x or false
-end
-
---- Are sets unequal?
---- @param x table|Set
---- @param y table|Set
---- @return Set|boolean
-function Set.ne(x, y)
-  return not Set.eq(x, y)
-end
-
---- Union of list elements
---- @param x table|Set
---- @param y table|Set
---- @return list
 function list.union(x, y)
-  return Set.items(Set(x) + Set(y))
+  x = Set(x)
+  y = Set(y)
+  return Set.items(x + y)
 end
 
---- Intersection of list elements
---- @param x table|Set
---- @param y table|Set
---- @return list
-function list.intersection(x, y)
-  return Set.items(Set(x) ^ Set(y))
-end
-
---- Difference of list elements
---- @param x table|Set
---- @param y table|Set
---- @return list
 function list.difference(x, y)
-  return Set.items(Set(x) - Set(y))
+  return Set.items(x - y)
 end
 
---- Is list x superset of list y
---- @param x table|Set
---- @param y table|Set
---- @return list|boolean
+function list.intersection(x, y)
+  return Set.items(x ^ y)
+end
+
+function list.strict_superset(x, y)
+  local res = Set(x) < Set(y)
+  if res then
+    return Set.items(res)
+  end
+end
+
 function list.superset(x, y)
-  return Set(x) >= Set(y) and x or false
+  local res = Set(x) <= Set(y)
+  if res then
+    return Set.items(res)
+  end
 end
 
---- Is list x subset of list y
---- @param x table|Set
---- @param y table|Set
---- @return list|boolean
+function list.strict_subset(x, y)
+  local res = Set(x) < Set(y)
+  if res then
+    return Set.items(res)
+  end
+end
+
 function list.subset(x, y)
-  return Set(x) <= Set(y) and x or false
+  local res = Set(x) <= Set(y)
+  if res then
+    return Set.items(res)
+  end
 end
 
---- Do lists have the same elements?
---- @param x table|Set
---- @param y table|Set
---- @return list|boolean
-function list.seteq(x, y)
-  return Set(x) == Set(y) and x or false
-end
-
---- Do lists not have the same elements
---- @param x table|Set
---- @param y table|Set
---- @return list|boolean
-function list.setne(x, y)
-  return not list.eqset(x, y)
-end
+dict.union = list.union
+dict.difference = list.difference
+dict.intersection = list.intersection
+dict.strict_superset = list.strict_superset
+dict.superset = list.superset
+dict.strict_subset = list.strict_subset
+dict.subset = list.subset

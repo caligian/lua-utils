@@ -79,7 +79,7 @@ function strsplit(x, sep, opts)
   end
 
   local len = #x
-  if init ~= len then
+  if init <= len then
     results[#results+1] = x:sub(init, len)
   end
 

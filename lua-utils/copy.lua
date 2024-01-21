@@ -3,7 +3,7 @@ local function _copy_list(x)
   local result = {}
   local tmp = result
   local X = x
-  local cache = {}
+  local cache = setmetatable({}, { mode = "k" })
 
   while true do
     for i = 1, #X do
@@ -77,11 +77,16 @@ function copy(x, islist)
     return x
   end
 
+  local mt = mtget(x)
   if islist then
     local result = {}
 
     for i = 1, #x do
       result[i] = x[i]
+    end
+
+    if mt then
+      setmetatable(result, mt)
     end
 
     return result
@@ -90,6 +95,10 @@ function copy(x, islist)
   local result = {}
   for key, value in pairs(x) do
     result[key] = value
+  end
+
+  if mt then
+    setmetatable(result, mt)
   end
 
   return result
