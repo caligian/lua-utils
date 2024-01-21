@@ -1,47 +1,15 @@
-require "lua-utils.utils"
-require 'lua-utils.string'
-
-local lpeg = require "lpeg"
-local P = lpeg.P
-local Cb = lpeg.Cb
-local B = lpeg.B
-local Cg = lpeg.Cg
-local S = lpeg.S
-local R = lpeg.R
-local C = lpeg.C
-local Ct = lpeg.Ct
-local Cp = lpeg.Cp()
-local Cs = lpeg.Cs
-local V = lpeg.V
-
-lpeg.locale(lpeg)
-
---[[
-f strings like in python. However they cannot execute arbitrary code
-
-echo {1} {2} {3}
-echo {path}
-sed -i '{sed_pat}' {fname}
-
-Add {} around the parenthesis to ignore it
-echo {{1}} -- will print echo {1}
-
---]]
-
 local parse = {}
 
 function parse.keys(match, repl)
-  local ks = strsplit(match, '%.')
+  local ks = strsplit(match, '%.', {escaped = true})
+  ks = list.map(ks, function (x) return tonumber(x) or x end)
+  local ok = dict.get(repl, ks)
 
-  ks = list.map(ks, function (x)
-    return tonumber(x) or x
-  end)
-  return dict.get(repl, ks)
+  return ok
 end
 
 function parse.sed(match, repl)
   local matches = strsplit(match, "/", {ignore_escaped = true})
-
   if #matches ~= 3 then
     error('spec should be {var_name, pattern, replacement}, got ' .. match)
   end
@@ -79,11 +47,13 @@ function parse.match(match, repl)
   repl = repl or {}
   local _, till = match:find "/"
   local var = match:sub(1, till - 1)
+  local sub = repl[var]
 
-  if not repl[var] then
+  if not sub then
     error("undefined placeholder: " .. var)
   else
-    assert_is_a(repl[var], union("string", "number"))
+    assert_is_a(sub, union("string", "number"))
+    sub = tostring(sub)
   end
 
   local regex = string.sub(match, till + 1, #match)
@@ -91,9 +61,9 @@ function parse.match(match, repl)
     error("no regex defined for placeholder: " .. match)
   end
 
-  local ok = repl[var]:match(regex)
+  local ok = sub:match(regex)
   if not ok then
-    error("match failure for " .. match .. " using " .. regex)
+    error("match failure for `" .. var .. "` with regex " .. regex)
   end
 
   return ok
@@ -121,48 +91,41 @@ function parse.parse(match, repl)
   end
 end
 
-local function gmatch(s, repl)
-  assert_is_a(repl, union('callable', 'table'))
 
-  local nl = P"\n" ^ 0
-  local escaped_open = P"\\{"
-  local escaped_close = P"\\}"
-  local paren_open = -B("\\") * P"{"
-  local paren_close = -B("\\") * P"}"
-  local before = C((1 - paren_open) ^ 0 + nl) 
-  local chars = C((1 - paren_close) ^ 1 + nl) / function (x)
-    if is_callable(repl) then
-      return repl(x)
+function template_replace(cmd, replacements)
+  local repl = mtset({}, {
+    __index = function(_, key)
+      local ok = parse.parse(key, replacements)
+      if not ok then error('undefined placeholder: ' .. key) end
+      return ok
+    end,
+  })
+
+  results = results or {}
+  local len = 0
+  local pos = strfind(cmd, "%{", { escaped = true })
+
+  if #pos == 0 then
+    return
+  end
+
+  local init = 1
+  for i = 1, #pos do
+    local open_pos = pos[i][1]
+    local close_pos = strfind(cmd, "%}", { init = open_pos + 1, escaped = true, max = 1 })
+    if #close_pos == 0 then
+      error("paren not closed for opening paren at char " .. open_pos)
+    else
+      close_pos = close_pos[1][1]
     end
 
-    local v = parse.parse(x, repl)
-    if is_nil(v) then
-      error('undefined placeholder: ' .. x)
-    end
-
-    return v
+    local before = cmd:sub(init, open_pos-1)
+    local word = repl[cmd:sub(open_pos + 1, close_pos - 1)]
+    init = close_pos+1
+    results[len+1] = before
+    results[len+2] = word
+    len = len + 2
   end
 
-  local pat = Ct((before * paren_open * chars * paren_close * before) ^ 0)
-  local ok = pat:match(s)
-
-  if #ok > 0 then
-    return (join(ok, ''):gsub('\\([{}])', '%1'))
-  end
-
-  return s
+  return join(results, "")
 end
-
-function F(x, vars)
-  local function use(_vars)
-    return gmatch(x, _vars)
-  end
-
-  if not vars then
-    return use
-  end
-
-  return use(vars)
-end
-
-template = F
