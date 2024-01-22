@@ -579,8 +579,6 @@ function list.contains(x, query_value, cmp)
       return key
     end
   end
-
-  return found
 end
 
 function dict.contains(x, query_value, cmp)
@@ -593,8 +591,6 @@ function dict.contains(x, query_value, cmp)
       return key
     end
   end
-
-  return found
 end
 
 --- return a range of numbers
