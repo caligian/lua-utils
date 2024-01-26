@@ -1,4 +1,5 @@
 require "lua-utils.utils"
+require 'lua-utils.types'
 
 local benchmark = namespace()
 local mt = { type = "benchmark" }
@@ -10,7 +11,6 @@ function mt:__newindex(name, fun)
     local now = os.clock()
     local elapsed = now - before
     self.elapsed = elapsed
-
     print("time elapsed to run " .. name .. ": " .. elapsed)
   end)
 end
@@ -27,7 +27,46 @@ function benchmark:__call()
   }, mt)
 end
 
--- local bm = benchmark()
+local bm = benchmark()
+
+bm.create_thousand_classes = function ()
+  for i = 1, 100000 do
+    local Vector = class("Vector", {})
+    Vector.init = function (self, x, y)
+      self.x = x
+      self.y = y
+      return self
+    end
+    local X = Vector(1, 2)
+    Vector.sum = function (self)
+      return self.x + self.y
+    end
+    local _ = X.sum
+  end
+end
+bm.create_thousand_structs_with_validation = function ()
+  for i = 1, 100000 do
+    local Vector = struct("Vector", {{'x', is_number}, {'y', is_number}})
+    Vector.init = function (self, x, y)
+      self.x = x
+      self.y = y
+      return self
+    end
+    local X = Vector(1, 2)
+    Vector.sum = function (self)
+      return self.x + self.y
+    end
+    local _ = Vector.sum
+    -- Vector.sum(X)
+  end
+end
+
+bm:run {
+  {'create_thousand_structs_with_validation', {}},
+  {'create_thousand_classes', {}}
+}
+
+
 -- bm.lpeg_template = template
 -- bm.template = template_replace
 
@@ -83,5 +122,6 @@ end
 -- )
 
 return benchmark
+
 
 

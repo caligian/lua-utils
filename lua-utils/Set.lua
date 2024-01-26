@@ -2,17 +2,30 @@ require "lua-utils.table"
 
 --- dictionary based set
 --- Other support operators:
---- > == (exactly equal), ~= (unequal), < (subset), > (superset)
+--- > a == b -- exact equality
+--- > a ~= b -- exact inequality
+--- > a <= b -- a is subset of b
+--- > a >= b -- a is superset of b
+--- > a <  b -- a is subset of b but b has more elems than a
+--- > a >  b -- b is subset of a but a has more elems than b
 --- @class Set
 --- @operator add(Set | list):Set union
 --- @operator sub(Set | list):Set difference
 --- @operator pow(Set | list):Set intersection
-Set = namespace 'Set'
+--- @operator mod(function):Set map
+--- @operator mul(function):Set reduce 
+--- @operator div(function): Set filter
+Set = namespace "Set"
 
+--- get set size
+--- @param self Set 
+--- @return integer?
 function Set.size(self)
   return size(self)
 end
 
+--- get set difference
+--- @param self Set
 function Set.difference(self, y)
   if typeof(y) ~= "Set" then
     self = copy(self)
@@ -85,7 +98,6 @@ function Set.union(self, y)
   return self
 end
 
-
 function Set.eq(self, other)
   assert_is_a.Set(other)
 
@@ -110,15 +122,15 @@ function Set.ne(other)
   return true
 end
 
-Set.filter = function (self, f, mapper)
+Set.filter = function(self, f, mapper)
   return list.filter(keys(self), f, mapper)
 end
 
-Set.map = function (self, f)
+Set.map = function(self, f)
   return list.map(keys(self), f)
 end
 
-Set.reduce = function (self, f)
+Set.reduce = function(self, f)
   local elems = keys(self)
   return list.reduce(elems, elems[1], f)
 end
@@ -146,8 +158,8 @@ function Set.items(self)
 end
 
 --------------------------------------------------
-local mt = { 
-  type = 'Set', 
+local mt = {
+  type = "Set",
   __eq = Set.eq,
   __ne = Set.ne,
   __concat = Set.add,
@@ -164,12 +176,15 @@ local mt = {
 }
 
 function Set:__call(tbl)
-  if typeof(tbl) == 'Set' then
+  if typeof(tbl) == "Set" then
     return tbl
   end
 
   --- @type Set
-  local obj = dict.from_list(tbl, function () return true end)
+  local obj = dict.from_list(tbl, function()
+    return true
+  end)
+
   mtset(obj, mt)
 
   return obj
@@ -226,3 +241,5 @@ dict.strict_superset = list.strict_superset
 dict.superset = list.superset
 dict.strict_subset = list.strict_subset
 dict.subset = list.subset
+
+

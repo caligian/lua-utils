@@ -169,7 +169,9 @@ end
 --- @param x list
 --- @param args list
 --- @return list
-function list.extend(x, args)
+function list.extend(x, ...)
+  local args = {...}
+
   for i = 1, #args do
     if is_table(args[i]) then
       for j = 1, #args[i] do
@@ -187,7 +189,9 @@ end
 --- @param x list
 --- @param args any
 --- @return list
-function list.append(x, args)
+function list.append(x, ...)
+  local args = {...}
+
   for i = 1, #args do
     x[#x + 1] = args[i]
   end
@@ -212,7 +216,8 @@ end
 --- @param x list
 --- @param args any
 --- @return list
-function list.lappend(x, args)
+function list.lappend(x, ...)
+  local args = {...}
   for i=#args, 1, -1 do
     return list.insert(x, 1, args[i])
   end
@@ -224,7 +229,9 @@ end
 --- @param x list
 --- @param args list
 --- @return list
-function list.lextend(x, args)
+function list.lextend(x, ...)
+  local args = {...}
+
   for i = #args, 1, -1 do
     local X = args[i]
     assert_is_a(X, "table")
@@ -942,7 +949,8 @@ function dict.items(t)
   return out
 end
 
-function dict.lmerge(x, args)
+function dict.lmerge(x, ...)
+  local args = {...}
   local cache = {}
 
   for i = 1, #args do
@@ -987,7 +995,8 @@ function dict.lmerge(x, args)
   return x
 end
 
-function dict.merge(x, args)
+function dict.merge(x, ...)
+  local args = {...}
   local cache = {}
 
   for i = 1, #args do
@@ -1510,20 +1519,5 @@ end
 dict.find_value = dict.contains
 list.find_value = list.contains
 
-function list.push(x, y)
-  return list.append(x, { y })
-end
-
-function list.lpush(x, y)
-  return list.lappend(x, { y })
-end
-
-list.unshift = list.lpush
-
-function dict.merge2(x, y)
-  return dict.merge(x, { y })
-end
-
-function dict.lmerge2(x, y)
-  return dict.merge(x, { y })
-end
+list.push = list.append
+list.unshift = list.lappend

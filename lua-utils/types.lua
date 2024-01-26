@@ -376,7 +376,7 @@ function namespace(name)
   end
 
   function mod:include_module(other)
-    return dict.merge(mod, { other })
+    return dict.merge(mod,  other)
   end
 
   function mod:get_methods()
@@ -733,7 +733,7 @@ function class:__call(name, static, opts)
   classmod.is_parent_of = class.is_parent_of
   classmodmt.module = classmod
 
-  dict.merge2(classmod, cls)
+  dict.merge(classmod, cls)
 
   if parent then
     assert_is_a.class(parent)
