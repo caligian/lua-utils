@@ -102,3 +102,97 @@ function params(specs)
     _claim(x, spec, name)
   end
 end
+
+
+--------------------------------------------------
+
+check_args = namespace 'arg_checker'
+
+local function equal(value, spec_value, display)
+  if is_function(spec_value) then
+    local ok, msg = spec_value(value)
+    if not ok then
+      msg = msg or 'callable failed for ' .. dump(value)
+      msg = display .. ': ' .. msg
+      error(msg)
+    end
+  elseif is_string(spec_value) then
+    if typeof(value) ~= spec_value then
+      error(display .. ': expected ' .. spec_value .. ', got ' .. dump(value))
+    end
+  elseif value ~= spec_value then
+    error(display .. ': expected ' .. type(spec_value) .. ', got ' .. dump(value))
+  end
+end
+
+function check_args.compare(obj, spec, _prefix)
+  if not is_table(obj) or not is_table(spec) then
+    equal(obj, spec, _prefix or '<base>')
+    return
+  end
+
+  local later = {}
+  local prefix = _prefix or '<base>'
+  local check = function (key, spec_value)
+    local is_opt
+    key = tostring(key)
+    key, is_opt = key:gsub('^opt_', '')
+    if is_opt == 0 then
+      key, is_opt = key:gsub('%?$', '')
+    end
+    is_opt = is_opt ~= 0
+    key = tonumber(key) or key
+    local value = obj[key]
+    local display = prefix .. '.' .. key
+
+    if is_nil(value) and is_opt then
+      return
+    end
+
+    if is_table(value) and is_table(spec_value) then
+      later[#later+1] = {value, spec_value, prefix}
+    elseif is_table(spec_value) then
+      error(display .. ': expected table, got ' .. dump(value))
+    else
+      equal(value, spec_value, display)
+    end
+  end
+
+  for key, value in pairs(spec) do
+    check(key, value)
+  end
+
+  for i = 1, #later do
+    check_args.compare(unpack(later[i]))
+  end
+
+  return obj
+end
+
+function check_args:__call(...)
+  local objs = pack_tuple(...)
+
+  return function (spec)
+    if not is_table(spec) then
+      error('expected a table as spec, got ' .. dump(spec))
+    end
+
+    for i = 1, #objs do
+      local obj = objs[i]
+      local obj_spec = spec[i]
+      if not is_nil(obj_spec) then
+        check_args.compare(obj, obj_spec, 'param<' .. i .. '>')
+      end
+    end
+  end
+end
+
+function check_args:__index(spec)
+  return mtset({}, {
+    __index = function (_, display)
+      return function (obj)
+        return check_args.compare(obj, spec, display or '<' .. tostring(obj) .. '>')
+      end
+    end
+  })
+end
