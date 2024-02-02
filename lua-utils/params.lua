@@ -109,20 +109,15 @@ end
 check_args = namespace 'arg_checker'
 
 local function equal(value, spec_value, display)
-  if is_function(spec_value) then
-    local ok, msg = spec_value(value)
-    if not ok then
-      msg = msg or 'callable failed for ' .. dump(value)
-      msg = display .. ': ' .. msg
-      error(msg)
-    end
-  elseif is_string(spec_value) then
-    if typeof(value) ~= spec_value then
-      error(display .. ': expected ' .. spec_value .. ', got ' .. dump(value))
-    end
-  elseif value ~= spec_value then
-    error(display .. ': expected ' .. type(spec_value) .. ', got ' .. dump(value))
+  local ok, msg =  is_a(value, spec_value)
+
+  if not ok then
+    msg = msg or 'expected ' .. dump(spec_value) .. ', got ' .. dump(value)
+    msg = display .. ':' .. msg
+    error(msg)
   end
+
+  return true
 end
 
 function check_args.compare(obj, spec, _prefix)

@@ -1,27 +1,6 @@
---- @class Argparser.Positional
---- @field name string|number
---- @field post function
---- @field assert function
---- @field help string
---- @field default function
---- @field arg any
---- @field type string
---- @field required boolean
-
---- @class Argparser.Option
---- @field name string
---- @field long string
---- @field short string
---- @field index number
---- @field post function
---- @field assert function
---- @field nargs number|string
---- @field help string
---- @field default function
---- @field args any[]
---- @field type string
---- @field required boolean
---- @field pos boolean is switch positional?
+require 'lua-utils.string'
+require 'lua-utils.table'
+require 'lua-utils.params'
 
 --- @class Argparser
 --- @field args string[]
@@ -31,74 +10,79 @@
 --- @field required table<string,Argparser.Option>
 --- @field positional table<string,Argparser.Option>
 --- @field optional table<string,Argparser.Option>
-
---- @type Argparser
 --- @overload fun(string, string): Argparser
 local Argparser = class "Argparser"
+
+--- @class Argparser.Option
+--- @field name? string
+--- @field long? string
+--- @field short? string
+--- @field index? number
+--- @field post? function
+--- @field assert? function
+--- @field nargs? number|string
+--- @field help? string
+--- @field default? function
+--- @field args? any[]
+--- @field metavar? string
+--- @field required? boolean
+--- @overload fun(table): Argparser.Option
 Argparser.Option = class "Argparser.Option"
+
+--- @class Argparser.Positional
+--- @field name? string|number
+--- @field post? function
+--- @field assert? function
+--- @field help? string
+--- @field default? function
+--- @field args? any[]
+--- @field required? boolean
+--- @field metavar? string
+--- @overload fun(table): Argparser.Positional
 Argparser.Positional = class "Argparser.Positional"
 
---- @type Argparser.Option
---- @overload fun(table): Argparser.Option
-local Option = Argparser.Option
+function Argparser.Positional:init(specs)
+  check_args[{
+    ["name?"] = union("string", "number"),
+    ["post?"] = "callable",
+    ["assert?"] = "callable",
+    ["help?"] = "string",
+    ["args?"] = "table",
+    ["default?"] = "callable",
+    ["required?"] = "boolean",
+    ["pos?"] = "boolean",
+    ["metavar?"] = "string",
+  }].options(specs)
 
---- @type Argparser.Positional
---- @overload fun(table): Argparser.Positional
-local Positional = Argparser.Positional
+  assert(specs.name, '.name missing in ' .. dump(specs))
 
-function Positional:init(specs)
-  params {
-    specs = {
-      {
-        ["name?"] = union("string", "number"),
-        ["post?"] = "callable",
-        ["assert?"] = "callable",
-        ["help?"] = "string",
-        ["args?"] = "table",
-        ["default?"] = "callable",
-        ["type?"] = "string",
-        ["required?"] = "boolean",
-        ["pos?"] = "boolean",
-        ["metavar?"] = "string",
-      },
-      specs,
-    },
-  }
-
-  specs.type = specs.type or "string"
   specs.help = specs.help or ""
-  specs.metavar = specs.metavar or specs.type:upper()
+  specs.metavar = specs.metavar or specs.name:upper()
 
   return dict.merge(self, specs)
 end
 
-function Option:init(specs)
-  params {
-    specs = {
-      {
-        ["metavar?"] = "string",
-        ["nargs?"] = union("string", "number"),
-        ["name?"] = "string",
-        ["short?"] = "string",
-        ["long?"] = "string",
-        ["index?"] = "number",
-        ["post?"] = "callable",
-        ["assert?"] = "callable",
-        ["help?"] = "string",
-        ["args?"] = "table",
-        ["default?"] = "callable",
-        ["type?"] = "string",
-        ["required?"] = "boolean",
-        ["pos?"] = "boolean",
-      },
-      specs,
-    },
-  }
+function Argparser.Option:init(specs)
+  check_args[{
+    ["metavar?"] = "string",
+    ["nargs?"] = union("string", "number"),
+    ["name?"] = "string",
+    ["short?"] = "string",
+    ["long?"] = "string",
+    ["index?"] = "number",
+    ["post?"] = "callable",
+    ["assert?"] = "callable",
+    ["help?"] = "string",
+    ["args?"] = "table",
+    ["default?"] = "callable",
+    ["required?"] = "boolean",
+  }].options(specs)
 
-  specs.name = specs.name or specs.long
-  specs.type = specs.type or "string"
+  assert(specs.long or specs.short, '.long or .short missing in ' .. dump(specs))
+
+  specs.name = specs.name or specs.long or specs.short
   specs.help = specs.help or ""
-  specs.metavar = specs.metavar or specs.type:upper()
+  specs.metavar = specs.metavar or specs.name:upper()
   specs.nargs = specs.nargs or 0
 
   return dict.merge(self, specs)
@@ -114,6 +98,13 @@ function Argparser:init(desc, short_desc)
   self.optional = {}
   self.positional = {}
   self.options = {}
+
+  self:on_optional {
+    long = 'help',
+    short = 'h',
+    required = false,
+    help = 'show this help',
+  }
 
   return self
 end
@@ -174,12 +165,18 @@ function Argparser:_findindex(args)
     local long = long_option and "--" .. long_option
     local short = short_option and "-" .. short_option
     local long_index = findall(args, long)
+
+    if long_option == 'help' and #long_index then
+      print(self:tostring())
+      os.exit(0)
+    end
+
     local short_index = findall(args, short)
     local all = list.extend(long_index, short_index)
     opt.index = all
 
     list.each(all, function(x)
-      list.append(withindex, { { x, name } })
+      list.append(withindex, { x, name })
     end)
   end)
 
@@ -278,8 +275,9 @@ function Argparser:parse(args)
     if nargs > passed then
       error(name .. ": expected " .. nargs .. ", got " .. passed)
     else
-      tail = list.sub(givenargs --[[@as list]], nargs + 1, -1)
-      last.args = list.sub(givenargs --[[@as list]], 1, nargs)
+      tail = list.sub(givenargs--[[@as list]], nargs + 1, -1)
+      ---@diagnostic disable-next-line
+      last.args = list.sub(givenargs, 1, nargs)
     end
   end
 
@@ -294,7 +292,7 @@ function Argparser:parse(args)
   end
 
   ---@diagnostic disable-next-line: param-type-mismatch
-  local positional = list.extend(head, { tail })
+  local positional = list.extend(head, tail)
   for i = 1, #positional do
     if not self.positional[i] then
       self.positional[i] = Argparser.Positional { name = i }
@@ -398,16 +396,32 @@ local function wrap_lines(full_name, help)
   return join(totalhelp, "")
 end
 
-function Argparser.Option:tostring()
-  local metavar, long, short, required, nargs, help, name
+function Argparser.Positional:tostring()
+  local metavar, required, help, name
   help = self.help or ""
-  metavar = self.metavar or "STR"
-  long = self.long
-  short = self.short
+  metavar = self.metavar
+  name = self.name
+  required = self.required
+
+  if required then
+    metavar = "{" .. metavar .. "}"
+  else
+    metavar = "[" .. metavar .. "]"
+  end
+
+  name = name .. " " .. metavar
+
+  return wrap_lines(name, help)
+end
+
+function Argparser.Option:tostring()
+  local metavar, required, nargs, help, name
+  help = self.help or ""
+  metavar = self.metavar
   required = self.required
   nargs = tostring(self.nargs)
-  short = short and "-" .. short
-  long = long and "--" .. long
+  short = self.short and "-" .. self.short
+  long = self.long and "--" .. self.long
   name = (long and short) and short .. ", " .. long or short or long
 
   if nargs ~= "0" and nargs ~= "?" then
@@ -425,10 +439,6 @@ function Argparser.Option:tostring()
   return wrap_lines(name, help)
 end
 
-function Argparser.Positional:tostring()
-  --- similar to above algo
-end
-
 function Argparser:tostring()
   local header = self.header
   local summary = self.summary
@@ -439,49 +449,35 @@ function Argparser:tostring()
   end
 
   local usage = {
-    scriptname .. ": " .. summary or "",
+    (scriptname .. ": " .. summary) or "",
     header or "",
     "",
   }
 
+  local pos_set
   if #self.positional > 0 then
-    list.append(usage, { "Positional arguments:" })
-
-    local names = list.map(self.positional, function(opt)
-      return {
-        opt.name,
-        opt.type,
-        opt.required or false,
-        opt.help or "",
-      }
-    end)
-    names = list.sort(names, function(a, b)
-      return #a[1] < #b[1]
-    end)
-    local longest = names[#names]
-    local longestlen = #longest
-
-    list.each(names, function(name)
-      local _name, _type, _required, _help = unpack(name)
-      local fmt = "%-" .. longestlen .. "s"
-
-      if _required then
-        fmt = fmt .. sprintf(" %-10s", sprintf(" {%s}:", _type))
-      else
-        fmt = fmt .. sprintf(" %-10s", sprintf(" [%s]:", _type))
-      end
-
-      fmt = fmt .. " " .. _help
-      fmt = sprintf(fmt, _name)
-
-      list.append(usage, { fmt })
-    end)
-
-    print(concat(usage, "\n"))
+    list.append(usage, "Positional Arguments:")
+    list.extend(usage, list.map(self.positional, function (x)
+      return x:tostring()
+    end))
+    pos_set = true
   end
+
+  if size(self.options)  > 0 then
+    if pos_set then
+      list.append(usage, "")
+    end
+
+    list.append(usage, "Keyword Arguments:")
+    list.extend(usage, list.map(values(self.options), function (x)
+      return x:tostring()
+    end))
+  end
+
+  return join(usage, "\n")
 end
 
-local s = "1 2 3 4 --name 1 -a 2 --name 2 3 4 10 --b-name 1 2 3 4 5 -b -1"
+local s = "1 2 3 4 --help --name 1 -a 2 --name 2 3 4 10 --b-name 1 2 3 4 5 -b -1"
 local parser = Argparser("Hello world", "!")
 parser.args = strsplit(s, " ")
 
@@ -493,7 +489,7 @@ parser:on {
 }
 
 parser:on {
-  required = false,
+  required = true,
   short = "b",
   long = "b-name",
   post = tonumber,
@@ -505,7 +501,6 @@ parser:on {
   name = "X",
   post = tonumber,
   help = "this is X",
-  type = "number",
   required = true,
 }
 
@@ -518,5 +513,4 @@ parser:on {
   required = true,
 }
 
--- pp(parser:parse())
--- print(parser.optional["b-name"]:tostring())
+print(parser:tostring())
