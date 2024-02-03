@@ -54,9 +54,12 @@ function mtget(obj, k)
 end
 
 --- Set metatable or metatable key
---- @param obj table
---- @param k any if v is nil then set k as metatable else retrieve key
---- @param v? any value to set
+--- > -- this will set the metatable
+--- > mtset({}, {})
+--- > 
+--- > -- this will set this value
+--- > mtset(obj, 'a', 'b')
+--- @param ... any 
 --- @return any
 function mtset(...)
   local n = select("#", ...)
@@ -92,6 +95,10 @@ function totable(x, force)
     return { x }
   end
 end
+
+to_table = totable
+to_string = tostring
+to_number = tonumber
 
 --- Return type based on lua type or <metatable>.type
 --- @param x any
@@ -280,29 +287,11 @@ function size(t)
   return n
 end
 
-function is_dict(x, dict_like)
-  if not is_table(x) then
-    return false, "expected table, got " .. dump(x)
-  end
-
-  local mt = not dict_like and getmetatable(x)
-  if mt and mt.type ~= "dict" then
-    return false, "expected dict, got " .. dump(x)
-  end
-
-  local len = size(x)
-  if len == 0 then
-    return false, "expected list, got empty table"
-  end
-
-  local ok = len ~= #x
-  if not ok then
-    return false, "expected dict, got list " .. dump(x)
-  end
-
-  return true
-end
-
+--- Check if a X is a nonempty list of elements
+--- @param x any[] x should not have a metatable unless the latter is defined
+--- @param list_like? boolean skip metatable check 
+--- @return any[]|false
+--- @return string? message failure message
 function is_list(x, list_like)
   if not is_table(x) then
     return false, "expected table, got " .. dump(x)
@@ -323,18 +312,22 @@ function is_list(x, list_like)
     return false, "expected list, got dict"
   end
 
-  return true
+  return x
 end
 
---- @
-function is_dict(x, skip_mtcheck)
+--- Check if a X is a nonempty table that is not a list
+--- @param x table x should not have a metatable unless the latter is defined
+--- @param dict_like? boolean skip metatable check 
+--- @return table|false
+--- @return string? message failure message
+function is_dict(x, dict_like)
   if not is_table(x) then
     return false, "expected table, got " .. dump(x)
-  elseif not skip_mtcheck then
+  elseif not dict_like then
     local mt = getmetatable(x)
     if mt then
       if mt.type == "dict" then
-        return true
+        return x
       elseif mt.type ~= nil then
         return false, "expected dict, got " .. dump(x)
       end
@@ -347,59 +340,111 @@ function is_dict(x, skip_mtcheck)
   elseif len == #x then
     return false, "expected dict, got list " .. dump(x)
   else
-    return true
+    return x
   end
 end
 
---- Create a namespace. It is possible to set metatable keys and retrieve them. Supports tostring()
+--- Define a namespace which is essentially a table with functions and other attributes
+--- Contains several useful methods to query the properties of the namespace
+--- You can also set metatable attributes directly via with the namespace table
+--- Useful for skeleton classes
+--- @class namespace
+--- @overload fun(name?: string): namespace
+namespace = {}
+ns = namespace
+local namespace_mt = { __tostring = dump, type = "namespace", module = namespace}
+mtset(namespace, namespace_mt)
+
+function namespace_mt:__call(name)
+  local mt = copy(namespace_mt)
+  mt.name = name
+  return mtset(copy(namespace) --[[@as namespace]], mt)
+end
+
+function namespace_mt:__newindex(key, value)
+  if mtkeys[key] then
+    mtset(self, key, value)
+  else
+    rawset(self, key, value)
+  end
+end
+
+function namespace_mt:__index(key)
+  if mtkeys[key] then
+    return mtget(self, key)
+  end
+end
+
+--- Get module name if defined
+--- @return string?
+function namespace:get_module_name()
+  return mtget(self, "name")
+end
+
+--- Include this table (basically merge the table)
+--- @param other table
+--- @return namespace
+function namespace:include_module(other)
+  return dict.merge(mod,  other)
+end
+
+--- Get all callables in a dict with their names
+--- @return table<any,function>
+function namespace:get_methods()
+  return dict.filter(self, function(_, value)
+    return is_callable(value)
+  end)
+end
+
+--- Get method as a function or an instance method
+--- @param name any
+--- @param inst_method? boolean instance method as f(self, ...)
+--- @return function?
+--- @return string? message failure message
+function namespace:get_method(name, inst_method)
+  local f = self[name]
+  if not f then
+    return nil, "invalid method name " .. dump(fn)
+  end
+
+  assert(is_callable(f))
+
+  if inst_method then
+    return function (...)
+      return f(self, ...)
+    end
+  end
+
+  return function(...)
+    return fn(self, ...)
+  end
+end
+
+--- Return the reference of current module
+--- @return namespace
+function namespace:get_module()
+  return mtget(self, 'module')
+end
+
+--- Default method for creating an object inheriting the namespace's attributes
+--- @param init? function init callable to use
 --- @return table
-function namespace(name)
-  local mod = {}
-  local mt = { __tostring = dump, type = "namespace", name = name }
+function namespace:create_instance(init, ...)
+  local obj = copy(self)
+  local mt = mtget(self)
+  mt.type = obj:get_module_name()
+  mt.__call = nil
+  mt.name = nil
+  mt.instance = true
+  obj.create_instance = nii
 
-  function mt:__newindex(key, value)
-    if mtkeys[key] then
-      mt[key] = value
-    else
-      rawset(self, key, value)
-    end
+  --- @cast obj namespace
+
+  if init then
+    return init(obj, ...)
   end
-
-  function mt:__index(key)
-    if mtkeys[key] then
-      return mt[key]
-    end
-  end
-
-  function mod:get_module_name()
-    return mtget(self, "name")
-  end
-
-  function mod:include_module(other)
-    return dict.merge(mod,  other)
-  end
-
-  function mod:get_methods()
-    return dict.filter(self, function(_, value)
-      return is_callable(value)
-    end)
-  end
-
-  function mod:get_method(fn)
-    if not self[fn] then
-      return nil, "invalid method name " .. dump(fn)
-    end
-
-    return function(...)
-      return fn(self, ...)
-    end
-  end
-
-  function mod:get_module()
-    return self or mod
-  end
-
-  return setmetatable(mod, mt)
+  
+  return obj
 end
 
 --- Is namespace?
@@ -414,6 +459,8 @@ function is_namespace(x)
 
   return x
 end
+
+is_ns = is_namespace
 
 function is_class(self)
   local ok = typeof(self)
@@ -432,8 +479,6 @@ end
 function is_literal(x)
   return is_string(x) or is_number(x) or is_boolean(x)
 end
-
----
 
 --- Return a function that checks union of types ...
 --- @param ... string|function|table
@@ -483,7 +528,10 @@ function union(...)
           failed[#failed + 1] = msg
         end
       elseif sig_type == "string" then
+        ---@diagnostic disable-next-line: param-type-mismatch
         local opt = string.match(current_sig, "^opt^")
+
+        ---@diagnostic disable-next-line: param-type-mismatch
         opt = opt or string.match(current_sig, "%?$")
 
         if x == nil then
@@ -509,15 +557,34 @@ function union(...)
 end
 
 --------------------------------------------------
-local is_a_mt = { type = "namespace" }
+--- Type checking module
+--- > form 1: is_a[<type_sig: function|string|table|object|any>](<obj>, assert_type?)
+--- > form 2: is_a(<type_sig: function|string|table|object|any>, <obj>, assert_type?)
+--- > is_a.string(1, true) -- will throw an error
+--- > is_a[union('string', 'number')](1) -- this will succeed
+--- > is_a(<obj>, <spec>)
+--- > is_a(1, function (x)
+--- >   local ok = x > 2
+--- >   if not ok then return false, 'expected more than 2, got ' .. dump(x) end
+--- >   return x
+--- > end, true) -- this will throw an error
+--- @overload fun(obj: any, spec: any, assert_type?: boolean): nil
 is_a = {}
-is_a_mt.__index = is_a_mt
-setmetatable(is_a, is_a_mt)
+local is_a_mt = { type = "namespace", name = 'is_a' }
+mtset(is_a, is_a_mt)
 
 function is_a_mt:__index(key)
   local f = union(key)
-  return function(x)
-    return f(x)
+  return function(x, ass)
+    local ok, msg = f(x)
+
+    if ass and not ok then
+      error(msg or ('callable failed for ' .. dump(x)))
+    elseif not ok then
+      return false, msg or ('callable failed for ' .. dump(x))
+    end
+
+    return x
   end
 end
 
@@ -534,69 +601,36 @@ function is_a_mt:__call(obj, expected, assert_type)
 end
 
 --------------------------------------------------
-local assert_is_a_mt = { type = "namespace" }
+--- Similar to is_a but throws an error at failure
+--- @see is_a 
+--- @overload fun(x: any, spec: any): nil
 assert_is_a = {}
-setmetatable(assert_is_a, assert_is_a_mt)
+local assert_is_a_mt = { type = "namespace" }
+mtset(assert_is_a, assert_is_a_mt)
 
---- Usage
---- @param key string|fun(x): boolean,string
---- @return function validator throws an error when validation fails
 function assert_is_a_mt:__index(key)
-  if is_function(key) then
-    return function(x)
-      assert(key(x))
-      return x
-    end
+  return function (x)
+    return is_a[key](x, true)
   end
-
-  local key_type = not is_string(key) and typeof(key) or key
-  local Gfun = _G["is_" .. key]
-    or function(x)
-      local x_type = typeof(x)
-      if x_type ~= key then
-        return false, ("expected " .. key_type .. ", got " .. x_type)
-      end
-
-      return x
-    end
-
-  local fun = function(x)
-    assert(Gfun(x))
-    return x
-  end
-
-  if not rawget(self, key) then
-    rawset(self, key, fun)
-  end
-
-  return fun
 end
 
-function assert_is_a_mt:__call(obj, expected)
-  if is_nil(obj) and is_nil(expected) then
-    return true
-  end
-
-  return assert_is_a[expected](obj)
+function assert_is_a_mt:__call(obj, spec)
+  return is_a[spec](obj, true)
 end
 
 --------------------------------------------------
-function ref(x)
-  if is_nil(x) then
-    return x
-  end
 
+--- Get table reference string. This will temporarily modify tables with custom __tostring methods
+--- @param x table
+--- @return string
+function ref(x)
   if not is_table(x) then
-    if is_literal(x) then
-      return x
-    else
-      return is_string(x)
-    end
+    return 
   end
 
   local mt = getmetatable(x)
   if not mt then
-    return is_string(x)
+    return tostring(x)
   end
 
   local tostring = rawget(mt, "__tostring")
@@ -607,12 +641,20 @@ function ref(x)
   return id
 end
 
+--- Check if x and y point to the same object
+--- @param x table
+--- @param y table
+--- @return boolean
 function sameref(x, y)
   return ref(x) == ref(y)
 end
 
 --------------------------------------------------
-class = namespace "class"
+
+--- Create a class module to create instances
+--- @class class : namespace
+--- @overload fun(name: string, static_methods: string[], opts: {parent?: class, include?: table}): class
+class = namespace "class" --[[@as class]]
 
 local non_class_attribs = {
   new = true,
@@ -630,6 +672,9 @@ local non_class_attribs = {
   super = true,
 }
 
+--- Get attributes w/o callables
+--- @param exclude_callables? boolean
+--- @return table<string,any>
 function class:get_attribs(exclude_callables)
   return dict.filter(self, function(key, value)
     if exclude_callables and is_callable(value) then
@@ -639,6 +684,8 @@ function class:get_attribs(exclude_callables)
   end)
 end
 
+--- Get parent for instance/classmodule
+--- @return table?
 function class:get_module_parent()
   return mtget(self, "parent")
 end
@@ -647,6 +694,9 @@ local check_type = function(x)
   return is_class(x) or is_instance(x)
 end
 
+--- Is Y a child of self
+--- @param other class|string class or class name
+--- @return class?
 function class:is_child_of(other)
   if not check_type(self) then
     return
@@ -657,6 +707,7 @@ function class:is_child_of(other)
     return
   end
 
+  ---@diagnostic disable-next-line: param-type-mismatch
   check_name = not is_string(other) and other:get_module_name() or other
   local self_parent = self:get_module_parent()
   local self_parent_name
@@ -679,10 +730,16 @@ function class:is_child_of(other)
   return self
 end
 
+--- Is Y parent of self
+--- @param other class|string class or class name
+--- @return class?
 function class:is_parent_of(other)
+  ---@diagnostic disable-next-line: param-type-mismatch
   return class.is_child_of(other, self)
 end
 
+--- Check if Y is a parent of self or self itself
+--- @param other class|string
 function class:is_a(other)
   local check = function(x)
     return check_type(x) or is_string(x)
@@ -691,6 +748,7 @@ function class:is_a(other)
   if not check(other) then
     return
   elseif not is_string(other) then
+    ---@diagnostic disable-next-line: param-type-mismatch
     other = other:get_module_name()
   end
 
@@ -704,9 +762,11 @@ end
 
 function class:__call(name, static, opts)
   opts = opts or {}
-  local classmod = namespace(name)
+
+  local classmod = namespace(name) --[[@as class]]
   local classmodmt = mtget(classmod)
   local parent = opts.parent
+  local include = opts.include
   static = copy(static or {})
   classmodmt.static = static
   classmodmt.type = "class"
@@ -735,6 +795,10 @@ function class:__call(name, static, opts)
 
   dict.merge(classmod, cls)
 
+  if include then
+    dict.merge(classmod, include)
+  end
+
   if parent then
     assert_is_a.class(parent)
     classmodmt.parent = parent
@@ -753,9 +817,9 @@ function class:__call(name, static, opts)
       return class[key]
     end
 
-    local parent = self:get_module_parent()
-    if parent then
-      return parent[key]
+    local p = self:get_module_parent()
+    if p then
+      return p[key]
     end
   end
 
@@ -771,6 +835,7 @@ function class:__call(name, static, opts)
     return mtget(self, "name")
   end
 
+  ---@diagnostic disable-next-line: inject-field
   function classmod:get_super_method()
     local _parent = self:get_module_parent()
 
@@ -786,6 +851,7 @@ function class:__call(name, static, opts)
     error('no init defined for ' .. dump(self))
   end
 
+  ---@diagnostic disable-next-line: inject-field
   function classmod:super(obj, ...)
     local super_fn = self:get_super_method()
     return super_fn(obj, ...)
@@ -817,6 +883,7 @@ function class:__call(name, static, opts)
     end
   end
 
+  ---@diagnostic disable-next-line: inject-field
   function classmod:get_static_methods()
     return mtget(self, "static")
   end
@@ -824,6 +891,8 @@ function class:__call(name, static, opts)
   function classmod:__call(...)
     local obj = mtset({}, objmt)
     local static_methods = self:get_static_methods()
+
+    --- @cast obj class
 
     for key, value in pairs(classmod) do
       if not static_methods[key] and not exclude[key] then
@@ -835,7 +904,9 @@ function class:__call(name, static, opts)
       return mtget(self, 'type')
     end
 
+    ---@diagnostic disable-next-line: undefined-field
     local init = self.init
+
     if init then
       return init(obj, ...)
     else
