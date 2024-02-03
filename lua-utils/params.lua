@@ -13,7 +13,7 @@ require "lua-utils.string"
 --- >   is_number,
 --- > }
 --- @overload fun(...:any): (fun(spec: any[]): boolean)
-check_args = namespace 'arg_checker'
+check_args = namespace 'arg_checker' --[[@as check_args]]
 
 local function equal(value, spec_value, display)
   local ok, msg =  is_a(value, spec_value)
