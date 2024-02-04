@@ -15,7 +15,7 @@ require "lua-utils.table"
 --- @operator mod(function):Set map
 --- @operator mul(function):Set reduce 
 --- @operator div(function): Set filter
-Set = namespace "Set"
+Set = ns "Set"
 
 --- get set size
 --- @param self Set 

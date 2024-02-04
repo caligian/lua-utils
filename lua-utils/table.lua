@@ -1,7 +1,7 @@
 require "lua-utils.utils"
 
-list = list or namespace()
-dict = dict or namespace()
+list = list or ns()
+dict = dict or ns()
 dict.keys = keys
 dict.values = values
 

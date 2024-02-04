@@ -1,7 +1,7 @@
 require "lua-utils.utils"
 require 'lua-utils.types'
 
-local benchmark = namespace()
+local benchmark = ns()
 local mt = { type = "benchmark" }
 
 function mt:__newindex(name, fun)
