@@ -229,10 +229,10 @@ function copy_mt:__call(x, opts)
       return copy.deep.table(x, opts)
     end
   elseif opts.list then
-    return copy.list(x, opts)
+    return copy.list(x, opts.metatable)
   end
 
-  return copy.table(x, opts)
+  return copy.table(x, opts.metatable)
 end
 
 function copy_deep_mt:__call(x, opts)
