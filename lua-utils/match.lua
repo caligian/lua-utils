@@ -472,9 +472,9 @@ function case.rules.dict_of(value_spec, key_spec)
 end
 
 function case.rules.re(...)
-  local pats = {...}
+  local pats = { ... }
 
-  return function (x)
+  return function(x)
     local ok, msg = is_string(x)
     if not ok then
       return ok, msg

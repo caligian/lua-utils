@@ -39,7 +39,7 @@ local mtkeys = {
 package.metatable_events = mtkeys
 
 --- Is event a valid metatable event?
---- @param event string 
+--- @param event string
 --- @return boolean
 function package:is_valid_event(event)
   return package.metatable_events[event] and true or false
@@ -69,7 +69,7 @@ end
 --- Set metatable or metatable key
 --- > -- this will set the metatable
 --- > mtset({}, {})
---- > 
+--- >
 --- > -- this will set this value
 --- > mtset(obj, 'a', 'b')
 --- @overload fun(x:table, mt:table): table
@@ -302,7 +302,7 @@ end
 
 --- Check if a X is a nonempty list of elements
 --- @param x any[] x should not have a metatable unless the latter is defined
---- @param list_like? boolean skip metatable check 
+--- @param list_like? boolean skip metatable check
 --- @return any[]|false
 --- @return string? message failure message
 function is_list(x, list_like)
@@ -330,7 +330,7 @@ end
 
 --- Check if a X is a nonempty table that is not a list
 --- @param x table x should not have a metatable unless the latter is defined
---- @param dict_like? boolean skip metatable check 
+--- @param dict_like? boolean skip metatable check
 --- @return table|false
 --- @return string? message failure message
 function is_dict(x, dict_like)
@@ -365,14 +365,14 @@ function is_instance(self)
   local inst, msg = mtget(self, instance)
 
   if not inst then
-    return nil, msg or ('expected object, got ' .. dump(self))
+    return nil, msg or ("expected object, got " .. dump(self))
   end
 
   return self
 end
 
 --- Check if x is an literal
---- Literals as in string, number and boolean 
+--- Literals as in string, number and boolean
 --- @param x string|number|boolean
 --- @return (string|number|boolean)?
 function is_literal(x)
@@ -384,7 +384,7 @@ end
 --- @return string
 function ref(x)
   if not is_table(x) then
-    return 
+    return
   end
 
   local mt = getmetatable(x)
@@ -408,13 +408,22 @@ function sameref(x, y)
   return ref(x) == ref(y)
 end
 
---- Throw error if test is false
---- @param name string
---- @param test boolean
---- @param msg? string additional context
-function throw(name, test, msg)
+local throw_mt = {}
+--- Throw error if test fails like assert but with a name
+--- > throw.variable_name(is_table(1)) -- variable_name: expected table, got "1"
+--- @overload fun(name: string, test: boolean, msg?: string)
+throw = setmetatable({}, throw_mt)
+
+function throw_mt:__call(name, test, msg)
   if not test then
-    error(dump(name) .. ': ' .. debug.traceback(msg or '', 3))
+    name = type(name) == "string" and name or dump(name)
+    error(dump(name) .. ": " .. debug.traceback(msg or "", 3))
+  end
+end
+
+function throw_mt:__index(name)
+  return function(obj, msg)
+    return throw(name, obj, msg)
   end
 end
 
@@ -432,24 +441,19 @@ function is_ns(x)
 end
 
 function is_class(x)
-  local ok = typeof(x) == 'class'
+  local ok = typeof(x) == "class"
   if not ok then
-    return nil, 'expected class, got ' .. dump(x)
+    return nil, "expected class, got " .. dump(x)
   end
   return x
 end
 
 function is_instance(x)
   local mt = mtget(x)
-  local fail = 
-  not mt 
-  or not mt.type
-  or not mt.class
-  or not mt.instance
-  or not is_class(mt.class)
+  local fail = not mt or not mt.type or not mt.class or not mt.instance or not is_class(mt.class)
 
   if fail then
-    return nil, 'expected instance, got ' .. dump(x)
+    return nil, "expected instance, got " .. dump(x)
   end
 
   return x
@@ -458,7 +462,7 @@ end
 function is_class_object(x)
   local ok = is_class(x) or is_instance(x) and x
   if not ok then
-    return nil, 'expected class or instance, got ' .. dump(x)
+    return nil, "expected class or instance, got " .. dump(x)
   end
   return x
 end

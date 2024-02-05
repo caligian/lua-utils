@@ -1,19 +1,38 @@
 local copy_mt = {}
 local copy_deep_mt = {}
+
+--- @class copy.opts
+--- @field depth? number by default, copy all levels
+--- @field map? function apply this function while copying
+--- @field metatable? boolean copy metatable?
+--- @field deep? boolean deepcopy table?
+--- @field list? boolean is table listlike?
+
+--- @class deepcopy.opts
+--- @field depth? number by default, copy all levels
+--- @field map? function apply this function while copying
+--- @field metatable? boolean copy metatable?
+--- @field list? boolean is table listlike?
+
+--- Copy table as list or table
+--- @overload fun(x:table|any[], opts?: copy.opts): table
 copy = setmetatable({}, copy_mt)
 copy.deep = setmetatable({}, copy_deep_mt)
+
+--- Deep copy table as list or table
+--- @overload fun(x:table|any[], opts?: deepcopy.opts): table
 deepcopy = copy.deep
 clone = deepcopy
 
 local function weak_table()
-  return setmetatable({}, {__mode = 'k'})
+  return setmetatable({}, { __mode = "k" })
 end
 
 --- Copy metatable of table
 --- @param x table
 --- @return table?
 function copy.metatable(x)
-  if type(x) ~= 'table' then
+  if type(x) ~= "table" then
     return
   end
 
@@ -32,14 +51,18 @@ end
 
 --- Copy table
 --- @param x table
---- @param cp_mt? boolean copy metatable?
+--- @param opts? {metatable?: boolean, map?: function} opts for copying
 --- @return table?
-function copy.table(x, cp_mt)
-  if type(x) ~= 'table' then
+function copy.table(x, opts)
+  if type(x) ~= "table" then
     return
   end
 
+  opts = opts or {}
   local out = {}
+  local f = opts.map
+  local cp_mt = opts.metatable
+
   if cp_mt then
     local mt = copy.metatable(x)
     if mt then
@@ -47,8 +70,8 @@ function copy.table(x, cp_mt)
     end
   end
 
-  for key, value in pairs(x)  do
-    out[key] = value
+  for key, value in pairs(x) do
+    out[key] = f and f(value) or value
   end
 
   return out
@@ -56,14 +79,18 @@ end
 
 --- Copy table as list
 --- @param x table
---- @param cp_mt? boolean copy metatable?
+--- @param opts? {metatable?: boolean, map?: function} opts for copying
 --- @return table?
 function copy.list(x, cp_mt)
-  if type(x) ~= 'table' then
+  if type(x) ~= "table" then
     return
   end
 
+  opts = opts or {}
   local out = {}
+  local f = opts.map
+  local cp_mt = opts.metatable
+
   if cp_mt then
     local mt = copy.metatable(x)
     if mt then
@@ -72,7 +99,7 @@ function copy.list(x, cp_mt)
   end
 
   for i = 1, #x do
-    out[i] = x[i]
+    out[i] = f and f(x[i]) or x[i]
   end
 
   return out
@@ -91,8 +118,8 @@ local function deep_copy_table(x, cp_mt, queue, cache, res, depth, current_depth
 
   local n = 1
 
-  for i,v  in pairs(x) do
-    if type(v) == 'table' then
+  for i, v in pairs(x) do
+    if type(v) == "table" then
       local cached = cache[v]
       if not cached then
         res[i] = {}
@@ -104,7 +131,7 @@ local function deep_copy_table(x, cp_mt, queue, cache, res, depth, current_depth
           cache,
           res[i],
           depth,
-          current_depth+1,
+          current_depth + 1,
           f,
         }
         n = n + 1
@@ -150,7 +177,7 @@ local function deep_copy_list(x, cp_mt, queue, cache, res, depth, current_depth,
   for i = 1, #x do
     local v = x[i]
 
-    if type(v) == 'table' then
+    if type(v) == "table" then
       local cached = cache[v]
       if not cached then
         res[i] = {}
@@ -162,7 +189,7 @@ local function deep_copy_list(x, cp_mt, queue, cache, res, depth, current_depth,
           cache,
           res[i],
           depth,
-          current_depth+1,
+          current_depth + 1,
           f,
         }
         n = n + 1
@@ -194,7 +221,7 @@ end
 
 --- Deep copy table
 --- @param x table
---- @param opts {depth?: number, map?: (fun(x:any):any), metatable?: boolean}
+--- @param opts {depth?: number, map?: function, metatable?: boolean}
 --- @return table?
 function copy.deep.table(x, opts)
   opts = opts or {}
@@ -208,7 +235,7 @@ end
 
 --- Deep copy table as list
 --- @param x any[]
---- @param opts {depth?: number, map?: (fun(x:any):any), metatable?: boolean}
+--- @param opts {depth?: number, map?: function, metatable?: boolean}
 --- @return any[]?
 function copy.deep.list(x, opts)
   opts = opts or {}
@@ -229,10 +256,10 @@ function copy_mt:__call(x, opts)
       return copy.deep.table(x, opts)
     end
   elseif opts.list then
-    return copy.list(x, opts.metatable)
+    return copy.list(x, opts)
   end
 
-  return copy.table(x, opts.metatable)
+  return copy.table(x, opts)
 end
 
 function copy_deep_mt:__call(x, opts)

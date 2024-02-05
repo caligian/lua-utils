@@ -1,7 +1,7 @@
 require "lua-utils.utils"
 
 list = list or ns()
-dict = dict or ns()
+dict = dict or ns() 
 dict.keys = keys
 dict.values = values
 
@@ -170,7 +170,7 @@ end
 --- @param args list
 --- @return list
 function list.extend(x, ...)
-  local args = {...}
+  local args = { ... }
 
   for i = 1, #args do
     if is_table(args[i]) then
@@ -190,7 +190,7 @@ end
 --- @param args any
 --- @return list
 function list.append(x, ...)
-  local args = {...}
+  local args = { ... }
 
   for i = 1, #args do
     x[#x + 1] = args[i]
@@ -217,8 +217,8 @@ end
 --- @param args any
 --- @return list
 function list.lappend(x, ...)
-  local args = {...}
-  for i=#args, 1, -1 do
+  local args = { ... }
+  for i = #args, 1, -1 do
     return list.insert(x, 1, args[i])
   end
 
@@ -230,7 +230,7 @@ end
 --- @param args list
 --- @return list
 function list.lextend(x, ...)
-  local args = {...}
+  local args = { ... }
 
   for i = #args, 1, -1 do
     local X = args[i]
@@ -313,7 +313,6 @@ function list.lpop(x)
   return list.pop(x, 1)
 end
 
-
 --- Join list with a string
 --- @param x list
 --- @param sep string
@@ -355,7 +354,7 @@ function list.sub(x, from, till)
   till = till < 0 and len + (till + 1) or till
 
   if from > till or till > len or from < 0 then
-    return
+    return {}
   end
 
   local res = {}
@@ -950,7 +949,7 @@ function dict.items(t)
 end
 
 function dict.lmerge(x, ...)
-  local args = {...}
+  local args = { ... }
   local cache = {}
 
   for i = 1, #args do
@@ -996,7 +995,7 @@ function dict.lmerge(x, ...)
 end
 
 function dict.merge(x, ...)
-  local args = {...}
+  local args = { ... }
   local cache = {}
 
   for i = 1, #args do

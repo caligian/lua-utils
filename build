@@ -1,1 +1,3 @@
 luarocks --local build
+rm -r ~/.config/nvim/lua/lua-utils
+cp -r lua-utils ~/.config/nvim/lua/lua-utils

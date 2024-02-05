@@ -21,6 +21,8 @@ function pack_tuple(...)
   return args
 end
 
+pack = pack_tuple
+
 --- @param x any
 --- @param force? bool forcefully wrap the elem in a table?
 --- @return table
@@ -257,5 +259,3 @@ function defined(x, orelse)
     return orelse
   end
 end
-
-

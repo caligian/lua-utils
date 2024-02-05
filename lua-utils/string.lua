@@ -15,16 +15,16 @@ function strfind(x, sep, opts)
   local results_len = 0
 
   local function get_next_sep(start_from)
-    local next_sep = {string.find(x, sep, start_from, plain)}
+    local next_sep = { string.find(x, sep, start_from, plain) }
 
     if #next_sep == 0 then
       return
     elseif escaped then
-      local last_pos = next_sep[2]-1
+      local last_pos = next_sep[2] - 1
       local last_char = x:sub(last_pos, last_pos)
 
       if last_char == "\\" then
-        return get_next_sep(next_sep[2]+1)
+        return get_next_sep(next_sep[2] + 1)
       end
     end
 
@@ -48,44 +48,43 @@ function strfind(x, sep, opts)
       results[results_len] = next_sep
     end
 
-    return findall(next_sep[2]+1)
+    return findall(next_sep[2] + 1)
   end
 
   return findall(init)
 end
 
 function strsplit(x, sep, opts)
-	if sep == "" then
-		local out = {}
-		for i=1, #x do
-			out[i] = x:sub(i, i)
-		end
-		return out
-	end
+  if sep == "" then
+    local out = {}
+    for i = 1, #x do
+      out[i] = x:sub(i, i)
+    end
+    return out
+  end
 
   opts = opts or {}
   local results = {}
   local pos = strfind(x, sep, opts)
 
   if #pos == 0 then
-    return {x}
+    return { x }
   end
 
   local init = opts.init or 1
-  for i=1, #pos do
-    local word = x:sub(init, pos[i][1]-1)
+  for i = 1, #pos do
+    local word = x:sub(init, pos[i][1] - 1)
     init = pos[i][2] + 1
-    results[#results+1] = word
+    results[#results + 1] = word
   end
 
   local len = #x
   if init <= len then
-    results[#results+1] = x:sub(init, len)
+    results[#results + 1] = x:sub(init, len)
   end
 
   return results
 end
-
 
 --- Matching multiple patterns
 --- @param x string

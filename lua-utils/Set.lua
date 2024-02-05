@@ -13,12 +13,12 @@ require "lua-utils.table"
 --- @operator sub(Set | list):Set difference
 --- @operator pow(Set | list):Set intersection
 --- @operator mod(function):Set map
---- @operator mul(function):Set reduce 
+--- @operator mul(function):Set reduce
 --- @operator div(function): Set filter
 Set = ns "Set"
 
 --- get set size
---- @param self Set 
+--- @param self Set
 --- @return integer?
 function Set.size(self)
   return size(self)
@@ -241,5 +241,3 @@ dict.strict_superset = list.strict_superset
 dict.superset = list.superset
 dict.strict_subset = list.strict_subset
 dict.subset = list.subset
-
-

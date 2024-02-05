@@ -1,85 +1,151 @@
-require 'lua-utils.types.utils'
+require "lua-utils.types.utils"
+
+local default_types = {}
+for key, fun in pairs(_G) do
+  if key:match "^is_" and key ~= "is_a" then
+    default_types[key] = fun
+  end
+end
+
+function is_union(x)
+  return typeof(x) == "union"
+end
+
+local union_mt = { type = "ns", name = "union" }
+union = mtset({}, union_mt)
+
+function union._match_else(value, spec)
+  local ok = value == spec
+  if not ok then
+    return false, dump(spec)
+  end
+
+  return value
+end
+
+function union._match_fun(value, spec)
+  local ok, msg = spec(value)
+  if not ok then
+    return false, msg or "callable failed for " .. dump(value)
+  end
+
+  return value
+end
+
+function union._match_table(value, spec)
+  if value == spec then
+    return value
+  elseif is_union(spec) then
+    local ok, failed = spec(value, true)
+    if ok then
+      return true
+    end
+    return false, failed
+  elseif not is_table(value) then
+    return false, typeof(spec)
+  elseif is_ns(spec) or is_class_object(spec) then
+    local spec_name = is_class_object(spec) and spec:get_class_name() or spec:get_ns_name()
+    local ok = spec:is_a(value)
+    if not ok then
+      return false, spec_name
+    end
+    return value
+  end
+
+  local spec_name = typeof(spec)
+  local ok = spec_name == typeof(value) == spec_name
+  if not ok then
+    return false, spec_name
+  end
+
+  return value
+end
+
+function union._match_string(value, spec)
+  local found = default_types["is_" .. spec]
+  if found then
+    local ok = found(value)
+    if not ok then
+      return false, spec
+    end
+    return value
+  elseif not is_table(value) then
+    return false, spec
+  end
+
+  ok = typeof(value) == spec
+  if not ok then
+    return false, spec
+  end
+
+  return value
+end
+
+function union.match(value, spec)
+  if is_string(spec) then
+    return union._match_string(value, spec)
+  elseif is_table(spec) then
+    return union._match_table(value, spec)
+  elseif is_function(spec) then
+    return union._match_fun(value, spec)
+  end
+  return union._match_else(value, spec)
+end
+
+local function is_union_of(value, ...)
+  local failed = {}
+  local check = { ... }
+
+  for i = 1, #check do
+    local ok, msg = union.match(value, check[i])
+    if not ok then
+      if is_table(msg) then
+        for i = j, #msg do
+          failed[#failed + 1] = msg[j]
+        end
+      else
+        failed[#failed + 1] = msg
+      end
+    else
+      return true
+    end
+  end
+
+  return failed
+end
 
 --- Return a function that checks union of types ...
 --- @param ... string|function|table
 --- @return fun(x): boolean, string?
-function union(...)
-  local sig = { ... }
+function union_mt:__call(...)
+  local args = pack(...)
 
-  return function(x)
-    local failed = {}
-    local x_type = typeof(x)
-
-    for i = 1, #sig do
-      local current_sig = sig[i]
-      local sig_type = type(sig[i])
-      local sig_name = typeof(sig[i])
-      local instance = mtget(current_sig, "instance")
-
-      if current_sig == 'instance' then
-        if instance then return true end
-        failed[#failed+1] = current_sig
-      elseif current_sig == 'class' then
-        if x_type == 'class' then return true end
-        failed[#failed+1] = current_sig
-      elseif current_sig == "*" or current_sig == "any" then
+  return setmetatable({}, {
+    __call = function(self, obj, get_failed)
+      local failed = is_union_of(obj, unpack(args))
+      if failed == true then
         return true
-      elseif current_sig == "list" then
-        if not is_list(x) then
-          failed[#failed + 1] = "list"
-        end
-      elseif current_sig == "dict" then
-        if not is_dict(x) then
-          failed[#failed + 1] = "dict"
-        end
-      elseif current_sig == "table" and is_table(x) then
-        return true
-      elseif current_sig == "callable" then
-        if not is_callable(x) then
-          failed[#failed + 1] = "callable"
-        end
-      elseif is_table(current_sig) then
-        if not is_table(x) then
-          failed[#failed + 1] = "table"
-        elseif is_class_object(current_sig) then
-          if not current_sig:is_a(x) then
-            failed[#failed + 1] = sig_name
-          end
-        elseif sig_name ~= x_type then
-          failed[#failed + 1] = sig_name
-        end
-      elseif is_function(current_sig) then
-        local ok, msg = current_sig(x)
-        if not ok then
-          failed[#failed + 1] = msg
-        end
-      elseif sig_type == "string" then
-        ---@diagnostic disable-next-line: param-type-mismatch
-        local opt = string.match(current_sig, "^opt^")
-
-        ---@diagnostic disable-next-line: param-type-mismatch
-        opt = opt or string.match(current_sig, "%?$")
-
-        if x == nil then
-          if not opt then
-            failed[#failed + 1] = current_sig
-          end
-        elseif x_type ~= current_sig then
-          failed[#failed + 1] = current_sig
-        end
-      elseif type(x) ~= sig_type then
-        if not ok then
-          failed[#failed + 1] = sig_type
-        end
       end
-    end
 
-    if #failed ~= #sig then
-      return true
-    else
-      return false, sprintf("expected any of %s, got %s", dump(sig), x_type)
-    end
-  end
+      local l = #failed
+      if l == 0 then
+        return true
+      elseif get_failed then
+        return false, failed
+      end
+
+      if l == 1 then
+        return false, "expected " .. failed[1] .. ", got " .. dump(obj)
+      end
+
+      ---@diagnostic disable-next-line
+      failed = join(failed, ", ")
+      local msg = "expected any of " .. failed .. ", got " .. dump(obj)
+
+      return false, msg
+    end,
+    type = "union",
+  })
 end
 
 --------------------------------------------------
@@ -96,51 +162,52 @@ end
 --- >   return x
 --- > end, true) -- this will throw an error
 --- @overload fun(obj: any, spec: any, assert_type?: boolean): nil
-is_a = {}
-local is_a_mt = { type = "ns", name = 'is_a' }
-mtset(is_a, is_a_mt)
-
-function is_a_mt:__index(key)
-  local f = union(key)
-  return function(x, ass)
-    local ok, msg = f(x)
-
-    if ass and not ok then
-      error(msg or ('callable failed for ' .. dump(x)))
-    elseif not ok then
-      return false, msg or ('callable failed for ' .. dump(x))
+--
+is_a = mtset({}, {
+  __call = function(_, obj, expected, assert_type)
+    if is_nil(obj) and is_nil(expected) then
+      return true
     end
 
-    return x
+    if assert_type then
+      assert(is_a[expected](obj))
+    end
+
+    return is_a[expected](obj)
+  end,
+  __index = function (_, key)
+    local f = not is_union(key) and union(key) or key
+    return function(obj, ass)
+      local ok, msg = f(obj)
+      if not ok then
+        if ass then
+          error(msg)
+        end
+        return false, msg
+      end
+      return true
+    end
   end
-end
+})
 
-function is_a_mt:__call(obj, expected, assert_type)
-  if is_nil(obj) and is_nil(expected) then
-    return true
+--- Assert value types
+--- > -- alternate form
+--- > -- typecheck.\<display: string\>.\<spec:any\>(obj: any)
+--- > typecheck['wrong arguments'].string(1)
+--- > -- above will throw an error: "wrong arguments: expected string, got 1"
+--- @see is_a
+--- @overload fun(obj: any, ...:any): boolean 
+typecheck = mtset({}, {
+  __index = function(_, name)
+    return mtset({}, {
+      __index = function(_, spec)
+        return function (obj)
+          return is_a(obj, spec, true)
+        end
+      end,
+    })
+  end,
+  __call = function(_, obj, ...)
+    return is_a(obj, union(...), true)
   end
-
-  if assert_type then
-    assert(is_a[expected](obj))
-  end
-
-  return is_a[expected](obj)
-end
-
---------------------------------------------------
---- Similar to is_a but throws an error at failure
---- @see is_a 
---- @overload fun(x: any, spec: any): nil
-assert_is_a = {}
-local assert_is_a_mt = { type = "ns" }
-mtset(assert_is_a, assert_is_a_mt)
-
-function assert_is_a_mt:__index(key)
-  return function (x)
-    return is_a[key](x, true)
-  end
-end
-
-function assert_is_a_mt:__call(obj, spec)
-  return is_a[spec](obj, true)
-end
+})

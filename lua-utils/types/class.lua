@@ -1,25 +1,28 @@
-require 'lua-utils.types.utils'
+require "lua-utils.types.utils"
 
+--- Get the class module for object
+--- @param x class x should be a class or an instance
+--- @return class?
 function get_class(x)
   if not is_table(x) then
     return
   elseif not is_class_object(x) then
-    return 
+    return
   elseif is_class(x) then
     return x
   elseif is_instance(x) then
-    return mtget(x, 'class')
+    return mtget(x, "class")
   end
 end
 
-local class_mt = {type = 'class'}
+local class_mt = { type = "class" }
 
 function class_mt:__newindex(key, value)
   if package.metatable_events[key] then
     class_mt[key] = value
   else
-    rawset(self, key, function (cls_or_inst, ...)
-      throw('cls_or_inst', is_class_object(cls_or_inst))
+    rawset(self, key, function(cls_or_inst, ...)
+      throw.cls_or_instance(is_class_object(cls_or_inst))
       return value(get_class(cls_or_inst), ...)
     end)
   end
@@ -30,6 +33,9 @@ end
 class = setmetatable({}, class_mt)
 class.get_class = get_class
 
+--- Get the nearest .init() method for class. Throws an error when no init method is found
+--- @param self class
+--- @return function
 function class:get_super_method()
   local _parent = self:get_class_parent()
 
@@ -42,9 +48,13 @@ function class:get_super_method()
     _parent = _parent:get_class_parent()
   end
 
-  error('no init defined for ' .. dump(self))
+  error("no init defined for " .. dump(self))
 end
 
+--- Use init method on and instance
+--- @param self class
+--- @param obj table
+--- @param ... any
 function class:super(obj, ...)
   local super_fn = self:get_super_method()
   return super_fn(obj, ...)
@@ -62,28 +72,44 @@ function class:get_attribs(exclude_callables)
   end)
 end
 
----@diagnostic disable-next-line: inject-field
+--- Get static methods for class
+--- @param self class
+--- @return table?
 function class:get_static_methods()
-  return mtget(self, "static")
+  local methods = mtget(self, "static")
+  if not methods then
+    return
+  end
+
+  local out = {}
+  for name, _ in pairs(methods) do
+    out[name] = self[name]
+  end
+
+  return out
 end
 
---- Get parent for instance/classns
---- @return table?
+--- Get class name
+--- @param self class
+--- @return string?
 function class:get_class_name()
   return mtget(self, "name")
 end
 
---- Get parent for instance/classns
+--- Get class parent
+--- @param self class
 --- @return table?
 function class:get_class_parent()
   return mtget(self, "parent")
 end
 
---- Is Y a child of self
---- @param other ns class
+--- Is other a child of self
+--- @param self class
+--- @param other class
 --- @return class?
 function class:is_child_of(other)
-  other = get_class(other)
+  other = get_class(other) --[[@as class]]
+
   if not other then
     return
   end
@@ -103,22 +129,25 @@ function class:is_child_of(other)
   return self
 end
 
---- Is Y parent of self
---- @param other ns class
+--- Is other parent of self
+--- @param self class
+--- @param other class
 --- @return class?
 function class:is_parent_of(other)
   ---@diagnostic disable-next-line: param-type-mismatch
   return class.is_child_of(other, self)
 end
 
---- Check if Y is a parent of self or self itself
---- @param other ns
+--- Check if other is a parent of self or self itself
+--- @param self class
+--- @param other class
+--- @return class?
 function class:is_a(other)
   if other == self then
     return other
   end
 
-  other = get_class(other)
+  other = get_class(other) --[[@as class]]
   if not other then
     return
   end
@@ -136,14 +165,14 @@ function class:is_a(other)
 end
 
 function class:__call(name, opts)
-  throw('name', is_string(name))
+  throw.name(is_string(name))
 
   if static then
-    throw('static', is_table(static))
+    throw.static(is_table(static))
   end
 
   if opts then
-    throw('opts', is_table(opts))
+    throw.opts(is_table(opts))
   end
 
   opts = opts or {}
@@ -151,10 +180,10 @@ function class:__call(name, opts)
   local parent = opts.parent
   local include = opts.include
   local classmodmt = {}
-  local classmod = mtset(copy.table(class), classmodmt)
+  local classmod = mtset(copy.table(class)--[[@as table]], classmodmt)
   classmodmt.static = static
   classmodmt.parent = parent
-  classmodmt.type = 'class'
+  classmodmt.type = "class"
   classmodmt.name = name
 
   if static[1] then
@@ -164,14 +193,14 @@ function class:__call(name, opts)
   end
 
   if include then
-    throw('opts.include', is_table(include))
+    throw.include(is_table(include))
     for key, value in pairs(include) do
-      dict.merge(classmod, include)
+      classmod[key] = value
     end
   end
 
   if parent then
-    throw('opts.parent', is_class_object(opts.parent))
+    throw.parent(is_class_object(opts.parent))
     classmodmt.parent = get_class(opts.parent)
   end
 
@@ -182,16 +211,16 @@ function class:__call(name, opts)
     end
   end
 
-  local objmt = { 
+  local objmt = {
     instance = true,
-    type = name, 
+    type = name,
     class = classmod,
-    __tostring = dump, 
+    __tostring = dump,
   }
 
   function objmt:__index(key)
-    if key == 'super' then
-      error('attempting to use .super() on instance: ' .. dump(self))
+    if key == "super" then
+      error("attempting to use .super() on instance: " .. dump(self))
     end
     return self:get_class()[key]
   end
@@ -220,7 +249,7 @@ function class:__call(name, opts)
     --- @cast obj class
 
     for key, value in pairs(classmod) do
-      if not static_methods[key] and key ~= 'init' and key ~= 'super' then
+      if not static_methods[key] and key ~= "init" and key ~= "super" then
         obj[key] = value
       end
     end
@@ -237,19 +266,19 @@ function class:__call(name, opts)
   return classmod
 end
 
-local G = class 'Grandpa'
-G.g_a = 1
-G.g_b = 2
+-- local G = class "Grandpa"
+-- G.g_a = 1
+-- G.g_b = 2
 
-function G:init(x, y)
-  self.g_x = x
-  self.g_y = y
-  return self
-end
+-- function G:init(x, y)
+--   self.g_x = x
+--   self.g_y = y
+--   return self
+-- end
 
-local P = class('Pa', { parent = G })
-function P:init(x, y)
-  self.p_x = x
-  self.p_y = y
-  return P:super(self, x, y)
-end
+-- local P = class("Pa", { parent = G })
+-- function P:init(x, y)
+--   self.p_x = x
+--   self.p_y = y
+--   return P:super(self, x, y)
+-- end

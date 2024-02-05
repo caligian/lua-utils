@@ -31,7 +31,6 @@ local function traverse_till_key(x, ks, makepath)
     end
   end
 
-
   local last_key = ks[#ks]
   if makepath and v[last_key] == nil then
     v[last_key] = {}

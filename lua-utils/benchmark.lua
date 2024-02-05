@@ -1,5 +1,5 @@
 require "lua-utils.utils"
-require 'lua-utils.types'
+require "lua-utils.types"
 
 local benchmark = ns()
 local mt = { type = "benchmark" }
@@ -29,31 +29,31 @@ end
 
 local bm = benchmark()
 
-bm.create_thousand_classes = function ()
+bm.create_thousand_classes = function()
   for i = 1, 100000 do
     local Vector = class("Vector", {})
-    Vector.init = function (self, x, y)
+    Vector.init = function(self, x, y)
       self.x = x
       self.y = y
       return self
     end
     local X = Vector(1, 2)
-    Vector.sum = function (self)
+    Vector.sum = function(self)
       return self.x + self.y
     end
     local _ = X.sum
   end
 end
-bm.create_thousand_structs_with_validation = function ()
+bm.create_thousand_structs_with_validation = function()
   for i = 1, 100000 do
-    local Vector = struct("Vector", {{'x', is_number}, {'y', is_number}})
-    Vector.init = function (self, x, y)
+    local Vector = struct("Vector", { { "x", is_number }, { "y", is_number } })
+    Vector.init = function(self, x, y)
       self.x = x
       self.y = y
       return self
     end
     local X = Vector(1, 2)
-    Vector.sum = function (self)
+    Vector.sum = function(self)
       return self.x + self.y
     end
     local _ = Vector.sum
@@ -62,10 +62,9 @@ bm.create_thousand_structs_with_validation = function ()
 end
 
 bm:run {
-  {'create_thousand_structs_with_validation', {}},
-  {'create_thousand_classes', {}}
+  { "create_thousand_structs_with_validation", {} },
+  { "create_thousand_classes", {} },
 }
-
 
 -- bm.lpeg_template = template
 -- bm.template = template_replace
@@ -122,6 +121,3 @@ bm:run {
 -- )
 
 return benchmark
-
-
-

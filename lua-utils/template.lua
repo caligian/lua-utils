@@ -1,5 +1,5 @@
 require "lua-utils.utils"
-require 'lua-utils.string'
+require "lua-utils.string"
 
 local lpeg = require "lpeg"
 local P = lpeg.P
@@ -31,19 +31,19 @@ echo {{1}} -- will print echo {1}
 local parse = {}
 
 function parse.keys(match, repl)
-  local ks = strsplit(match, '%.')
+  local ks = strsplit(match, "%.")
 
-  ks = list.map(ks, function (x)
+  ks = list.map(ks, function(x)
     return tonumber(x) or x
   end)
   return dict.get(repl, ks)
 end
 
 function parse.sed(match, repl)
-  local matches = strsplit(match, "/", {ignore_escaped = true})
+  local matches = strsplit(match, "/", { ignore_escaped = true })
 
   if #matches ~= 3 then
-    error('spec should be {var_name, pattern, replacement}, got ' .. match)
+    error("spec should be {var_name, pattern, replacement}, got " .. match)
   end
 
   local var, regex, with = unpack(matches)
@@ -122,32 +122,33 @@ function parse.parse(match, repl)
 end
 
 local function gmatch(s, repl)
-  assert_is_a(repl, union('callable', 'table'))
+  assert_is_a(repl, union("callable", "table"))
 
-  local nl = P"\n" ^ 0
-  local escaped_open = P"\\{"
-  local escaped_close = P"\\}"
-  local paren_open = -B("\\") * P"{"
-  local paren_close = -B("\\") * P"}"
-  local before = C((1 - paren_open) ^ 0 + nl) 
-  local chars = C((1 - paren_close) ^ 1 + nl) / function (x)
-    if is_callable(repl) then
-      return repl(x)
+  local nl = P "\n" ^ 0
+  local escaped_open = P "\\{"
+  local escaped_close = P "\\}"
+  local paren_open = -B "\\" * P "{"
+  local paren_close = -B "\\" * P "}"
+  local before = C((1 - paren_open) ^ 0 + nl)
+  local chars = C((1 - paren_close) ^ 1 + nl)
+    / function(x)
+      if is_callable(repl) then
+        return repl(x)
+      end
+
+      local v = parse.parse(x, repl)
+      if is_nil(v) then
+        error("undefined placeholder: " .. x)
+      end
+
+      return v
     end
-
-    local v = parse.parse(x, repl)
-    if is_nil(v) then
-      error('undefined placeholder: ' .. x)
-    end
-
-    return v
-  end
 
   local pat = Ct((before * paren_open * chars * paren_close * before) ^ 0)
   local ok = pat:match(s)
 
   if #ok > 0 then
-    return (join(ok, ''):gsub('\\([{}])', '%1'))
+    return (join(ok, ""):gsub("\\([{}])", "%1"))
   end
 
   return s

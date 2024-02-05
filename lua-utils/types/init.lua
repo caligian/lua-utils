@@ -1,3 +1,3 @@
-require 'lua-utils.class'
-require 'lua-utils.ns'
-require 'lua-utils.typecheck'
+require "lua-utils.types.class"
+require "lua-utils.types.ns"
+require "lua-utils.types.typecheck"

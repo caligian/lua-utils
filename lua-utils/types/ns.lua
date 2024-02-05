@@ -1,17 +1,18 @@
-require 'lua-utils.types.utils'
+--- @meta
+
+require "lua-utils.types.utils"
 
 --- Define a ns which is essentially a table with functions and other attributes
 --- Contains several useful methods to query the properties of the ns
 --- You can also set metatable attributes directly via with the ns table
---- Useful for skeleton classes
 --- @class ns
 --- @overload fun(name?: string): ns
 ns = {}
-local ns_mt = { __tostring = dump, type = "ns"}
+local ns_mt = { __tostring = dump, type = "ns" }
 mtset(ns--[[@as table]], ns_mt)
 
 function ns_mt:__call(name)
-  return copy.table(ns, {metatable=true})
+  return copy.table(ns --[[@as table]], { metatable = true })
 end
 
 function ns_mt:__newindex(key, value)
@@ -38,7 +39,7 @@ end
 --- @param other table
 --- @return ns
 function ns:include(other)
-  return dict.merge(mod,  other)
+  return dict.merge(mod, other)
 end
 
 --- Get all callables in a dict with their names
@@ -63,27 +64,25 @@ function ns:get_method(name, inst_method)
   assert(is_callable(f))
 
   if inst_method then
-    return function (...)
+    return function(...)
       return f(self, ...)
     end
   end
 
-  return function(...)
-    return fn(self, ...)
-  end
+  return f
 end
 
 --- Check if self is a valid ns
 --- @param other table Check if other is the same ns as self
 --- @return table?, string?
 function ns:is_a(other)
-  throw('self', is_ns(self))
-  throw('other', is_ns(other))
+  throw.self(is_ns(self))
+  throw.other(is_ns(other))
 
   ok = self:get_ns_name() == other:get_ns_name()
 
   if not ok then
-    return nil, 'expected ' .. dump(other) .. ', got ' .. dump(self)
+    return nil, "expected " .. dump(other) .. ", got " .. dump(self)
   end
 
   return self
