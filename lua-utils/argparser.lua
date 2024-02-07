@@ -1,10 +1,6 @@
 require "lua-utils.string"
 require "lua-utils.table"
-require "lua-utils.form"
-
-local function get_script_name()
-  return debug.getinfo(2, "S").source:sub(2):match "^.+/([^$]+)$"
-end
+require "lua-utils.types.form"
 
 --- @class Argparser
 --- @field args string[]
@@ -50,11 +46,11 @@ function Argparser.Positional:init(specs)
     ["name?"] = union("string", "number"),
     ["post?"] = "callable",
     ["assert?"] = "callable",
-    ["help?"] = union("string", "table"),
+    ["help?"] = "string",
     ["args?"] = "table",
     ["default?"] = "callable",
     ["required?"] = "boolean",
-    ["positional?"] = "boolean",
+    ["pos?"] = "boolean",
     ["metavar?"] = "string",
   }].options(specs)
 
@@ -76,7 +72,7 @@ function Argparser.Option:init(specs)
     ["index?"] = "number",
     ["post?"] = "callable",
     ["assert?"] = "callable",
-    ["help?"] = union("string", "table"),
+    ["help?"] = "string",
     ["args?"] = "table",
     ["default?"] = "callable",
     ["required?"] = "boolean",
@@ -86,16 +82,17 @@ function Argparser.Option:init(specs)
 
   specs.name = specs.name or specs.long or specs.short
   specs.help = specs.help or ""
+  specs.metavar = specs.metavar or specs.name:upper()
   specs.nargs = specs.nargs or 0
-  specs.metavar = specs.nargs ~= 0 and (specs.metavar or specs.name:upper()) or ""
 
   return dict.merge(self, specs)
 end
 
-function Argparser:init(desc)
+function Argparser:init(desc, short_desc)
   self.parsed = {}
   self.args = arg or {}
-  self.summary = desc
+  self.header = desc
+  self.summary = short_desc
   self.options = {}
   self.required = {}
   self.optional = {}
@@ -115,7 +112,8 @@ end
 function Argparser:on_positional(switch)
   switch = Argparser.Positional(switch)
   self.positional[#self.positional + 1] = switch
-  return self
+
+  return switch
 end
 
 function Argparser:on_optional(switch)
@@ -123,23 +121,25 @@ function Argparser:on_optional(switch)
   switch.required = false
   self.optional[switch.name] = switch
   self.options[switch.name] = switch
-  return self
+
+  return switch
 end
 
 function Argparser:on_required(switch)
   switch = Argparser.Option(switch)
   self.required[switch.name] = switch
   self.options[switch.name] = switch
-  return self
+
+  return switch
 end
 
 function Argparser:on(switch)
-  if switch.positional then
-    return self:on_positional(switch)
+  if switch.pos then
+    self:on_positional(switch)
   elseif switch.required then
-    return self:on_required(switch)
+    self:on_required(switch)
   else
-    return self:on_optional(switch)
+    self:on_optional(switch)
   end
 end
 
@@ -165,16 +165,13 @@ function Argparser:_findindex(args)
     local long = long_option and "--" .. long_option
     local short = short_option and "-" .. short_option
     local long_index = findall(args, long)
-    local short_index = findall(args, short)
 
-    if short_option == "h" and #short_index > 0 then
-      print(self:gen_header())
-      os.exit(0)
-    elseif long_option == "help" and #long_index > 0 then
-      print(self:gen_help())
+    if long_option == "help" and #long_index then
+      print(self:tostring())
       os.exit(0)
     end
 
+    local short_index = findall(args, short)
     local all = list.extend(long_index, short_index)
     opt.index = all
 
@@ -229,22 +226,8 @@ end
 
 function Argparser:parse(args)
   args = args or self.args
-  local till_sep = list.find_value(args, "--")
   local index = self:_findindex(args)
-  local last, first, head, tail, after_sep
-  head = {}
-  tail = {}
-  local parsed = {}
-  local pos = {}
-
-  if till_sep then
-    after_sep = list.sub(args, till_sep + 1, -1)
-    args = list.sub(args, 1, till_sep - 1)
-  else
-    after_sep = {}
-  end
-
-  self.args = args
+  local last, first
 
   for i = 1, #index do
     local from, till = index[i], index[i + 1]
@@ -273,6 +256,7 @@ function Argparser:parse(args)
   local givenargs = last.args
   local nargs = last.nargs
   local passed = #givenargs
+  local tail
 
   if nargs == "?" then
     if passed ~= 0 and passed ~= 1 then
@@ -298,6 +282,8 @@ function Argparser:parse(args)
   end
 
   first = self.options[first]
+  local head = {}
+
   if first ~= last then
     if first.index[1] ~= 1 then
       ---@diagnostic disable-next-line: cast-local-type
@@ -306,10 +292,10 @@ function Argparser:parse(args)
   end
 
   ---@diagnostic disable-next-line: param-type-mismatch
-  local positional = list.extend(head, tail, after_sep)
+  local positional = list.extend(head, tail)
   for i = 1, #positional do
     if not self.positional[i] then
-      pos[i] = positional[i]
+      self.positional[i] = Argparser.Positional { name = i }
     end
   end
 
@@ -322,14 +308,14 @@ function Argparser:parse(args)
 
     local claim = opt.assert
     local post = opt.post
-    local x = positional[i]
+    opt.arg = positional[i]
 
     if post then
-      x = post(x)
+      opt.arg = post(opt.arg)
     end
 
     if claim then
-      local ok, msg = claim(x)
+      local ok, msg = claim(opt.arg)
 
       if not ok then
         if msg then
@@ -341,15 +327,31 @@ function Argparser:parse(args)
         error(msg)
       end
     end
-
-    pos[i] = x
-    parsed[opt.name:gsub('-', '_')] = x
   end)
 
-  dict.each(self.options, function(_name, switch)
-    if switch.args then
-      validateargs(switch)
-      parsed[_name:gsub("-", "_")] = switch.args
+  local parsed = {}
+  local pos = {}
+
+  dict.each(self.required, function(_name, switch)
+    validateargs(switch)
+    parsed[_name:gsub("-", "_")] = switch.args
+  end)
+
+  dict.each(self.optional, function(_, switch)
+    validateargs(switch)
+    parsed[name:gsub("-", "_")] = switch.args
+  end)
+
+  list.eachi(self.positional, function(i, switch)
+    name = switch.name
+    if is_number(name) then
+      pos[name] = switch.arg
+    else
+      pos[name:gsub("-", "_")] = switch.arg
+    end
+
+    if not pos[i] then
+      pos[i] = switch.arg
     end
   end)
 
@@ -366,230 +368,155 @@ end
 
 --]]
 
-function Argparser.Positional:gen_header(metavar_only)
-  local metavar, required
-  metavar = self.metavar
-  required = self.required
-  local name = self.name
+local function wrap_lines(full_name, help)
+  local maxlen = 30
+  local optlen = #full_name
+  local totalhelp = { full_name }
 
-  if metavar_only then
-    if required then
-      metavar = "{" .. metavar .. "}"
-    else
-      metavar = "[" .. metavar .. "]"
-    end
-  elseif required then
-    metavar = "{" .. metavar .. "}"
-    metavar = name .. " " .. metavar
+  if optlen > maxlen then
+    totalhelp[#totalhelp + 1] = "\n"
+    totalhelp[#totalhelp + 1] = string.rep(" ", maxlen)
   else
-    metavar = "[" .. metavar .. "]"
-    metavar = name .. " " .. metavar
+    totalhelp[#totalhelp + 1] = string.rep(" ", maxlen - optlen)
   end
 
-  return metavar, self.help, #metavar
+  local ctr = 0
+  for value in string.gmatch(help, "[^%s]+") do
+    if ctr > maxlen then
+      ctr = 0
+      totalhelp[#totalhelp + 1] = "\n" .. string.rep(" ", maxlen + 1)
+    else
+      ctr = ctr + #value
+      totalhelp[#totalhelp + 1] = " "
+    end
+
+    totalhelp[#totalhelp + 1] = value
+  end
+
+  return join(totalhelp, "")
 end
 
-function Argparser.Option:gen_header(use_long_also)
-  local metavar, required, nargs, name, short, long
+function Argparser.Positional:tostring()
+  local metavar, required, help, name
+  help = self.help or ""
+  metavar = self.metavar
+  name = self.name
+  required = self.required
+
+  if required then
+    metavar = "{" .. metavar .. "}"
+  else
+    metavar = "[" .. metavar .. "]"
+  end
+
+  name = name .. " " .. metavar
+
+  return wrap_lines(name, help)
+end
+
+function Argparser.Option:tostring()
+  local metavar, required, nargs, help, name
+  help = self.help or ""
   metavar = self.metavar
   required = self.required
   nargs = tostring(self.nargs)
   short = self.short and "-" .. self.short
   long = self.long and "--" .. self.long
-
-  if not use_long_also then
-    if short then
-      name = short
-    else
-      name = long
-    end
-  elseif short and long then
-    name = short .. ", " .. long
-  else
-    name = long
-  end
+  name = (long and short) and short .. ", " .. long or short or long
 
   if nargs ~= "0" and nargs ~= "?" then
     if required then
-      metavar = "{" .. metavar .. "=" .. nargs .. "}"
+      metavar = "{" .. metavar .. "}"
     else
-      metavar = "[" .. metavar .. "=" .. nargs .. "]"
+      metavar = "[" .. metavar .. "]"
     end
+    name = name .. " " .. metavar .. "<" .. nargs .. ">"
   elseif nargs == "?" then
-    metavar = "[" .. metavar .. ":?]"
+    metavar = "[" .. metavar .. "]<1>"
+    name = name .. " " .. metavar
   end
 
-  name = name .. " " .. metavar
-  return name, self.help or "", #name
+  return wrap_lines(name, help)
 end
 
---------------------------------------------------
-local function get_max(xs)
-  local max_len = -1
-
-  for i = 1, #xs do
-    local l = xs[i][3]
-    if max_len < l then
-      max_len = l
-    end
+function Argparser:tostring()
+  local header = self.header
+  local summary = self.summary
+  local scriptname
+  do
+    local str = debug.getinfo(2, "S").source:sub(2)
+    scriptname = str:match "^.*/(.*).lua$" or str
   end
 
-  return max_len
-end
-
---- @param prefix string
---- @param desc string
---- @param max? number
-local function nlwrap(prefix, desc, max, suffix_nl)
-  max = max + 2
-  local nl = "\n"
-  local ws = " "
-  local d = 80
-  local too_big = max > d and true or false
-  local ws_prefix = string.rep(ws, max)
-  local first_ws_prefix = string.rep(ws, max - #prefix)
-  local result = {
-    prefix,
-    too_big and nl or "",
-    first_ws_prefix,
+  local usage = {
+    (scriptname .. ": " .. summary) or "",
+    header or "",
+    "",
   }
-  local result_len = 3
-  local ctr = #prefix + list.reduce(result, 0, function(x, acc)
-    return acc + #x
-  end)
 
-  local push = function(x, l)
-    result[result_len + 1] = x
-    result_len = result_len + 1
-    ctr = ctr + (l or #x)
+  local pos_set
+  if #self.positional > 0 then
+    list.append(usage, "Positional Arguments:")
+    list.extend(
+      usage,
+      list.map(self.positional, function(x)
+        return x:tostring()
+      end)
+    )
+    pos_set = true
   end
 
-  local function should_break(l)
-    if ctr + l > d then
-      return true
+  if size(self.options) > 0 then
+    if pos_set then
+      list.append(usage, "")
     end
-    return false
+
+    list.append(usage, "Keyword Arguments:")
+    list.extend(
+      usage,
+      list.map(values(self.options), function(x)
+        return x:tostring()
+      end)
+    )
   end
 
-  local function wrap_words(x)
-    for match in string.gmatch(x, "[^%s]+") do
-      local l = #match
-      if should_break(l) then
-        ctr = 0
-        push(nl, 1)
-        push(ws_prefix, r)
-      end
-      push(match, l)
-      push(ws, 1)
-    end
-  end
-
-  desc = totable(desc)
-  for i = 1, #desc do
-    wrap_words(desc[i])
-  end
-
-  if suffix_nl then
-    push(nl, 1)
-  end
-
-  return join(result, "")
+  return join(usage, "\n")
 end
 
-local function gen_help_options(parser, maxlen)
-  local options = values(parser.options)
-  local options_parsed = list.map(options, function(x)
-    return { x:gen_header(true) }
-  end)
-  local max_opt_len = get_max(options_parsed)
-  local parsed = list.map(options_parsed, function(state)
-    return nlwrap(state[1], state[2], max_opt_len, true)
-  end)
-  return join(parsed, "\n")
-end
-
-local function gen_help_positional(parser, maxlen)
-  local positional = values(parser.positional)
-  local positional_parsed = list.map(positional, function(x)
-    return { x:gen_header(true) }
-  end)
-  local max_opt_len = get_max(positional_parsed)
-  local parsed = list.map(positional_parsed, function(state)
-    return nlwrap(state[1], state[2], max_opt_len)
-  end)
-
-  return join(parsed, "\n")
-end
-
-local function gen_header(parser)
-  local positional = values(parser.positional)
-  local positional_parsed = list.map(positional, function(x)
-    return { x:gen_header(true) }
-  end)
-  local options = values(parser.options)
-  local options_parsed = list.map(options, function(x)
-    return { x:gen_header(false) }
-  end)
-  local script = get_script_name()
-  local get_name = function(x)
-    return x[1]
-  end
-  local all_switches = list.map(list.extend(positional_parsed, options_parsed), get_name)
-
-  return nlwrap(script, all_switches, #script)
-end
-
-Argparser.gen_header = gen_header
-
-function Argparser:gen_help()
-  return join({
-    gen_header(self),
-    self.summary,
-    "",
-    "Positional Arguments",
-    gen_help_positional(self),
-    "",
-    "Keyword arguments",
-    gen_help_options(self),
-  }, "\n")
-end
-
---------------------------------------------------
-local s = "1 2 3 4 --name 1 -a 2 --name 2 3 4 10 --b-name 1 2 3 4 5 -b -1 -- extra args"
+local s = "1 2 3 4 --help --name 1 -a 2 --name 2 3 4 10 --b-name 1 2 3 4 5 -b -1"
 local parser = Argparser("Hello world", "!")
 parser.args = strsplit(s, " ")
 
-parser
-  :on({
-    short = "a",
-    long = "name",
-    help = "please print something here or else i will die of not getting attention",
-    nargs = "*",
-  })
-  :on({
-    required = true,
-    short = "b",
-    long = "b-name",
-    post = tonumber,
-    nargs = 1,
-    help = "please print something here or else i will die of not getting attention",
-  })
-  :on({
-    positional = true,
-    name = "X",
-    post = tonumber,
-    help = "this is X",
-    required = true,
-  })
-  :on {
-    positional = true,
-    name = "Y",
-    post = tonumber,
-    help = "this is Y",
-    required = true,
-  }
+parser:on {
+  short = "a",
+  long = "name",
+  help = "please print something here or else i will die of not getting attention",
+  nargs = "*",
+}
 
-pp(parser:parse())
--- handle args after --
--- truncate the args till -- and store extra
--- add extra to head args
+parser:on {
+  required = true,
+  short = "b",
+  long = "b-name",
+  post = tonumber,
+  nargs = 1,
+}
+
+parser:on {
+  pos = true,
+  name = "X",
+  post = tonumber,
+  help = "this is X",
+  required = true,
+}
+
+parser:on {
+  pos = true,
+  name = "Y",
+  post = tonumber,
+  help = "this is Y",
+  type = "number",
+  required = true,
+}
+
+print(parser:tostring())

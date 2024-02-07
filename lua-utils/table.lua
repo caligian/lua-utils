@@ -354,7 +354,7 @@ function list.sub(x, from, till)
   till = till < 0 and len + (till + 1) or till
 
   if from > till or till > len or from < 0 then
-    return {}
+    return
   end
 
   local res = {}

@@ -7,11 +7,7 @@ for key, fun in pairs(_G) do
   end
 end
 
-function is_union(x)
-  return typeof(x) == "union"
-end
-
-local union_mt = { type = "ns", name = "union" }
+local union_mt = {type = 'union', method = true}
 union = mtset({}, union_mt)
 
 function union._match_else(value, spec)
@@ -35,7 +31,7 @@ end
 function union._match_table(value, spec)
   if value == spec then
     return value
-  elseif is_union(spec) then
+  elseif is_method(spec) then
     local ok, failed = spec(value, true)
     if ok then
       return true
@@ -84,10 +80,10 @@ end
 function union.match(value, spec)
   if is_string(spec) then
     return union._match_string(value, spec)
-  elseif is_table(spec) then
-    return union._match_table(value, spec)
   elseif is_function(spec) then
     return union._match_fun(value, spec)
+  elseif is_table(spec) then
+    return union._match_table(value, spec)
   end
   return union._match_else(value, spec)
 end
@@ -135,12 +131,12 @@ function union_mt:__call(...)
       end
 
       if l == 1 then
-        return false, "expected " .. failed[1] .. ", got " .. dump(obj)
+        return false, "expected " .. failed[1] .. ", got " .. dump(value)
       end
 
       ---@diagnostic disable-next-line
       failed = join(failed, ", ")
-      local msg = "expected any of " .. failed .. ", got " .. dump(obj)
+      local msg = "expected any of " .. failed .. ", got " .. dump(value)
 
       return false, msg
     end,
@@ -176,7 +172,7 @@ is_a = mtset({}, {
     return is_a[expected](obj)
   end,
   __index = function (_, key)
-    local f = not is_union(key) and union(key) or key
+    local f = type(key) == 'union' and union(key) or key
     return function(obj, ass)
       local ok, msg = f(obj)
       if not ok then
@@ -187,27 +183,5 @@ is_a = mtset({}, {
       end
       return true
     end
-  end
-})
-
---- Assert value types
---- > -- alternate form
---- > -- typecheck.\<display: string\>.\<spec:any\>(obj: any)
---- > typecheck['wrong arguments'].string(1)
---- > -- above will throw an error: "wrong arguments: expected string, got 1"
---- @see is_a
---- @overload fun(obj: any, ...:any): boolean 
-typecheck = mtset({}, {
-  __index = function(_, name)
-    return mtset({}, {
-      __index = function(_, spec)
-        return function (obj)
-          return is_a(obj, spec, true)
-        end
-      end,
-    })
-  end,
-  __call = function(_, obj, ...)
-    return is_a(obj, union(...), true)
   end
 })

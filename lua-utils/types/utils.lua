@@ -3,10 +3,15 @@ require "lua-utils.copy"
 inspect = require "inspect"
 inspect = inspect.inspect
 
+--- @alias method function|table
+
 --- Dump object
 --- @param x any
 --- @return string
 function dump(x)
+  if type(x) == 'string' or type(x) == 'number' then
+    return x
+  end
   return inspect(x)
 end
 
@@ -44,6 +49,8 @@ package.metatable_events = mtkeys
 function package:is_valid_event(event)
   return package.metatable_events[event] and true or false
 end
+
+is_valid_event = package.is_valid_event
 
 --- Get metatable or metatable key
 --- @param obj table
@@ -466,3 +473,74 @@ function is_class_object(x)
   end
   return x
 end
+
+--- Check if args are a function or method (table with mt.__call and mt.method = true)
+--- @overload fun(mod: table, f: string): function?, string?
+--- @overload fun(obj: table|function): (table|function)?, string?
+function is_method(...)
+  local is_f = is_function
+  local is_t = is_table
+
+  local function recursive_check(x)
+    if is_f(x) then
+      return x
+    elseif not is_t(x) then
+      return nil, 'expected table or function, got ' .. dump(x)
+    end
+
+    local mt = mtget(x) or {}
+    if mt.__call and mt.method and recursive_check(mt.__call) then
+      return x
+    end
+
+    return nil, 'expected table with mt.method and mt.__call<method|function>, got ' .. dump(x)
+  end
+
+  local args = {...}
+  local nargs = #args
+
+  if nargs == 1 then
+    return recursive_check(args[1])
+  elseif nargs ~= 2 then
+    return nil, 'expected <function>|<table>, <field>, got ' .. dump(args)
+  end
+
+  return recursive_check(unpack(args))
+end
+
+--- Define a method object. This is useful for differentiating instances and types from methods
+--- @overload fun(fn: method): table
+--- @overload fun(mod: table, fn: method): table
+function defn(...)
+  local args = {...}
+  local nargs = #args
+
+  local function create(f, obj)
+    local mt = {method = true}
+    obj = mtset(obj or {}, mt)
+
+    function mt:__call(...)
+      return f(...)
+    end
+
+    return obj
+  end
+
+  if nargs == 1 then
+    local f = args[1]
+    assert(is_method(f))
+
+    return create(f)
+  elseif nargs == 2 then
+    local m = args[1]
+    local f = args[2]
+
+    assert(is_table(m))
+    assert(is_method(f))
+
+    return create(f, m)
+  end
+
+  error('expected table with at least 1 value, got ' .. dump(args))
+end
+

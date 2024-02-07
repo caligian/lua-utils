@@ -1,5 +1,3 @@
---- @meta
-
 require "lua-utils.table"
 require "lua-utils.string"
 require "lua-utils.types.typecheck"
@@ -111,4 +109,12 @@ function form:__index(spec)
       end
     end,
   })
+end
+
+--- alias for form()
+--- @param ... any any parameters to check
+--- @see form
+--- @return fun(spec: any[]): boolean
+function params(...)
+  return form(...)
 end

@@ -1,8 +1,20 @@
 require "lua-utils.table"
 require "lua-utils.copy"
 
-case = ns()
-case.rules = ns()
+--- @class case.rule
+--- @field [1] any `==` for literals, tables will be compared recursively and method() will be used as type assertion
+--- @field [2] method method to run when signature matches
+
+--- @class case.var
+--- @field name? string
+--- @field test? method|table|boolean|any
+
+--- @class case : ns
+--- @field rules table<any,case.rule>
+case = ns() --[[@as case]]
+
+--- @class case.rules : ns
+case.rules = ns() --[[@as case.rules]]
 
 function case.var(name, test)
   if type(name) ~= "string" and type(name) ~= "number" then
@@ -10,7 +22,7 @@ function case.var(name, test)
     name = nil
   end
 
-  return setmetatable({ name = name, test = test }, { type = "match.variable" })
+  return setmetatable({ name = name, test = test }, { type = "match.variable" }) --[[@as case.var]]
 end
 
 --- @param x any
@@ -28,7 +40,7 @@ function case.test(obj, spec, opts)
   local match = opts.match
   local ass = opts.assert
 
-  if is_function(spec) and (cond or match) then
+  if is_method(spec) and (cond or match) then
     local ok, msg = spec(obj)
 
     if not ok then
@@ -117,11 +129,11 @@ function case.test(obj, spec, opts)
   local State = state
   local prefix = ""
 
-  local function cmp(x, y, k, prefix)
-    if not prefix then
-      prefix = k
+  local function cmp(x, y, k, _prefix)
+    if not _prefix then
+      _prefix = k
     else
-      prefix = prefix .. "." .. k
+      _prefix = _prefix .. "." .. k
     end
 
     if not is_nil(x) and pre_a then
@@ -134,7 +146,7 @@ function case.test(obj, spec, opts)
 
     if is_nil(x) then
       if ass then
-        error(prefix .. ": expected value, got nil")
+        error(_prefix .. ": expected value, got nil")
       elseif absolute then
         return false
       else
@@ -149,36 +161,36 @@ function case.test(obj, spec, opts)
 
       if is_nil(test) then
         Vars[name] = x
-      elseif is_table(test) then
-        if not is_table(x) then
-          if ass then
-            error(prefix .. ": expected table, got " .. type(x))
-          else
-            return false
-          end
-        else
-          Vars[name] = {}
-          queue:add { x, test, vars = Vars[name], prefix = prefix }
-        end
-      elseif is_function(test) then
+      elseif is_method(test) then
         local ok, msg = test(x)
         if ok then
           Vars[name] = x
         elseif ass then
           if msg then
-            error(prefix .. ": " .. msg)
+            error(_prefix .. ": " .. msg)
           end
-          error(prefix .. ": callable failed for " .. dump(x))
+          error(_prefix .. ": callable failed for " .. dump(x))
         else
           return false
+        end
+      elseif is_table(test) then
+        if not is_table(x) then
+          if ass then
+            error(_prefix .. ": expected table, got " .. type(x))
+          else
+            return false
+          end
+        else
+          Vars[name] = {}
+          queue:add { x, test, vars = Vars[name], _prefix = _prefix }
         end
       else
         error "match.variable.test should be (function|table)?"
       end
-    elseif is_table(y) then
+    elseif is_table(y) and not is_method(y) then
       if not is_table(x) then
         if ass then
-          error(prefix .. ": expected table, got " .. type(x))
+          error(_prefix .. ": expected table, got " .. type(x))
         elseif absolute then
           return false
         else
@@ -189,15 +201,15 @@ function case.test(obj, spec, opts)
         queue:add {
           x,
           y,
-          prefix = prefix,
+          _prefix = _prefix,
           state = State--[[@as table]][k],
         }
       elseif match then
-        queue:add { x, y, vars = Vars, prefix = prefix }
+        queue:add { x, y, vars = Vars, _prefix = _prefix }
       else
-        queue:add { x, y, prefix = prefix }
+        queue:add { x, y, _prefix = _prefix }
       end
-    elseif (cond or match) and is_function(y) then
+    elseif (cond or match) and is_method(y) then
       local ok, msg = y(x)
       if ok then
         if not absolute then
@@ -205,9 +217,9 @@ function case.test(obj, spec, opts)
         end
       elseif ass then
         if msg then
-          error(prefix .. ": " .. msg)
+          error(_prefix .. ": " .. msg)
         end
-        error(prefix .. ": callable failed for " .. dump(obj_value))
+        error(_prefix .. ": callable failed for " .. dump(obj_value))
       elseif absolute then
         return false
       else
@@ -219,13 +231,13 @@ function case.test(obj, spec, opts)
           State[key] = true
         end
       elseif ass then
-        error(prefix .. ": unequal elements: \n" .. dump(x) .. "\n" .. dump(y))
+        error(_prefix .. ": unequal elements: \n" .. dump(x) .. "\n" .. dump(y))
       elseif absolute then
         return false
       end
     elseif x ~= y then
       if ass then
-        error(prefix .. ": unequal elements: \n" .. dump(x) .. "\n" .. dump(y))
+        error(_prefix .. ": unequal elements: \n" .. dump(x) .. "\n" .. dump(y))
       elseif absolute then
         return false
       else
@@ -244,11 +256,7 @@ function case.test(obj, spec, opts)
     end
 
     for i, validator in pairs(Spec) do
-      local key = i
-      local obj_value
-
-      obj_value = Obj[i]
-
+      local obj_value = Obj[i]
       if not cmp(obj_value, validator, i, prefix) then
         return false
       end
@@ -311,12 +319,13 @@ function case.compare(a, b, opts)
   return case.test(a, b, opts)
 end
 
-function case.unpack(a, b)
+function case.capture(a, b)
   opts = opts or {}
   opts.capture = true
   return case.test(a, b, opts)
 end
 
+--- @class case.rules
 local Eq = case.rules
 
 function Eq.literal(spec)
@@ -361,10 +370,6 @@ function Eq.pred(preds)
       return f(obj)
     end)
   end
-end
-
-function Eq.is_a(spec)
-  return is_a[spec]
 end
 
 function Eq.lt(spec)
@@ -451,23 +456,27 @@ function Eq.gt(spec)
   end
 end
 
-function case.rules.list_of(value_spec)
+function case.rules.dict_of(value_spec)
   return function(x)
-    if #x == 0 then
+    if not is_table(x) then
+      return false, "expected dict, got " .. dump(x)
+    elseif #x == 0 then
       return false
     end
-    local ok = list.is_a(x, value_spec)
-
+    local ok = dict.is_a(x, value_spec)
     return ok
   end
 end
 
-function case.rules.dict_of(value_spec, key_spec)
+function case.rules.list_of(value_spec)
   return function(x)
-    if is_empty(x) then
+    if not is_table(x) then
+      return false, "expected list, got " .. dump(x)
+    elseif #x == 0 then
       return false
     end
-    return dict.is_a(x, value_spec, key_spec)
+    local ok = list.is_a(x, value_spec)
+    return ok
   end
 end
 
@@ -512,16 +521,19 @@ function case.R(callback, ...)
 end
 
 local function case_call(specs)
+  --- @type case
   local case_obj = mtset({
-    {},
+    case = {},
+
+    --- @type table<any,case.rule>
     rules = {},
 
     match = function(self, obj)
-      if #self[1] == 0 then
+      if #self.case == 0 then
         error "no rules added yet"
       end
 
-      local rules = self[1]
+      local rules = self.case
 
       for i = 1, #rules do
         local rule = rules[i]
@@ -565,7 +577,6 @@ local function case_call(specs)
 
     match_rule = function(self, obj, rule)
       local ok = self:test_rule(obj, rule)
-
       if ok then
         return rule[2](ok)
       end
@@ -581,14 +592,14 @@ local function case_call(specs)
           self.rules[rule.name] = rule
         end
 
-        self[1][#self[1] + 1] = rule
+        self.case[#self.case + 1] = rule
       end
 
       return self
     end,
 
-    from_list = function(self, specs)
-      return self:add(unpack(specs))
+    from_list = function(self, _specs)
+      return self:add(unpack(_specs))
     end,
 
     add = function(self, ...)
@@ -596,23 +607,23 @@ local function case_call(specs)
 
       local function add_rule(rule)
         assert(#rule == 2, "expected {<spec>, <callable>}, got " .. dump(rule))
-        assert_is_a.callable(rule[2])
 
-        local len = #self[1]
+        form[is_method].callable(rule[2])
+
+        local len = #self.case
         local name = rule.name or len + 1
         self.rules[name] = rule
-        self[1][len + 1] = rule
+        self.case[len + 1] = rule
       end
 
       for i = 1, #args do
         local rule = args[i]
-
-        assert_is_a.table(rule)
+        form.table.rule(rule)
 
         if typeof(rule) == "case.range" then
           list.each(rule, add_rule)
         else
-          add_rule(rule, i)
+          add_rule(rule)
         end
       end
 
@@ -623,6 +634,7 @@ local function case_call(specs)
   })
 
   if is_table(specs) then
+    ---@diagnostic disable-next-line: undefined-field
     case_obj:from_list(specs)
   end
 
@@ -638,56 +650,70 @@ function is_multimethod(x)
 end
 
 function multimethod(specs)
-  local rules = case(specs)
-  local obj = ns()
+  --- @class multimethod
+  --- @field rules table<any,method>
+  local obj = ns() --[[@as multimethod]]
   local mt = mtget(obj)
 
+  obj.case = case(specs)
+
+  local case_obj = obj.case
   mt.type = "multimethod"
+  mt.method = true
 
-  function obj:literal_add(sig, callback)
-    rules:add { sig, callback, absolute = true, match = false, cond = false }
+  local function conv(x)
+    if is_method(x) then
+      return { x }
+    elseif not is_table(x) then
+      return { x }
+    else
+      return x
+    end
+  end
+
+  function obj:L(sig, callback)
+    case_obj:add { conv(sig), callback, absolute = true, match = false, cond = false }
     return obj
   end
 
-  function obj:capture_add(sig, callback)
-    rules:add { sig, callback, capture = true }
+  function obj:C(sig, callback)
+    case_obj:add { conv(sig), callback, capture = true }
     return obj
   end
 
-  function obj:match_add(sig, callback)
-    rules:add { sig, callback, match = true }
+  function obj:M(sig, callback)
+    case_obj:add { conv(sig), callback, match = true }
     return obj
   end
 
-  function obj:add(sig, callback)
-    rules:add { sig, callback, cond = true }
+  function obj:P(sig, callback)
+    case_obj:add { conv(sig), callback, cond = true }
     return obj
   end
-
-  obj.L = obj.literal_add
-  obj.M = obj.match_add
-  obj.C = obj.capture_add
-  obj.P = obj.add
 
   function mt:__newindex(sig, callback)
-    rules:add { sig, callback, cond = true }
-    return callback
+    return self:P(sig, callback)
   end
 
   function mt:__index(rule_name)
-    return rules.rules[rule_name]
+    return case_obj.rules[rule_name]
   end
 
   function mt:__call(...)
     local args = pack_tuple(...)
+    local all = case_obj.case
 
-    for i = 1, #rules[1] do
-      local rule = rules[1][i]
-      local ok = rules:test_rule(args, rule)
+    for i = 1, #all do
+      local rule = all[i]
+      local ok = case_obj:test_rule(args, rule)
       local cb = rule[2]
 
       if ok then
-        return cb(unpack(ok))
+        if not rule.match and not rule.capture then
+          return cb(unpack(ok))
+        end
+
+        return cb(ok)
       end
     end
 
@@ -697,10 +723,15 @@ function multimethod(specs)
   return obj
 end
 
---[[
-run_spec = multimethod()
+-- local mm = multimethod()
+-- local V = case.V
 
-run_spec[case.rules.list_of 'number'] = function (x)
-  return 'fuckin list'
-end
---]]
+-- mm:C({ "A", "B", "C", { "DD" } }, function(O, a, b)
+--   return O, a, b
+-- end)
+
+-- mm:P({ { is_number, 2, 3, { "d" } }, 1, 2 }, function(O, a, b)
+--   return O, a, b
+-- end)
+
+-- pp(mm({ 11111, 2, 3, { "d" } }, 1, 2))
