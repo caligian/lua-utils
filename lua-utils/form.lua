@@ -53,7 +53,7 @@ function form.compare(obj, spec, _prefix)
 
     if is_nil(value) and is_opt then
       return
-    elseif is_union(spec_value) then
+    elseif is_method(spec_value) then
       local ok, msg = spec_value(value)
       if not ok then
         error(display .. ': ' .. msg)

@@ -172,7 +172,7 @@ is_a = mtset({}, {
     return is_a[expected](obj)
   end,
   __index = function (_, key)
-    local f = type(key) == 'union' and union(key) or key
+    local f = typeof(key) ~= 'union' and union(key) or key
     return function(obj, ass)
       local ok, msg = f(obj)
       if not ok then
@@ -184,4 +184,15 @@ is_a = mtset({}, {
       return true
     end
   end
+})
+
+assert_is_a = mtset({}, {
+	__index = function(_, key)
+		return function(obj) 
+			return is_a(obj, key, true)
+		end
+	end,
+	__call = function(_, obj, expected)
+		return is_a(obj, expected, true)
+	end,
 })
