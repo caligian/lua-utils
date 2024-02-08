@@ -4,6 +4,24 @@ require "lua-utils.table"
 
 substr = string.sub
 
+--- @class strfind.opts
+--- @field max? number max number of splits
+--- @field plain? boolean match pattern plainly instead of using regex
+--- @field escaped? boolean ignore escaped pattern
+--- @field ignore_escaped? boolean alias for escaped
+--- @field capture? boolean capture the string matched 
+--- @field init? number init position
+
+--- @class strfind.result
+--- @field [1] number init pos
+--- @field [2] number end pos
+--- @field [3] string captured string 
+
+--- Find the index of string `sep`
+--- @param x string
+--- @param sep string
+--- @param opts? strfind.opts
+--- @return strfind.result[]
 function strfind(x, sep, opts)
   opts = opts or {}
   local max = opts.max
@@ -29,6 +47,7 @@ function strfind(x, sep, opts)
     end
 
     if capture then
+      ---@diagnostic disable-next-line: param-type-mismatch
       next_sep[3] = x:sub(unpack(next_sep))
     end
 
@@ -54,6 +73,14 @@ function strfind(x, sep, opts)
   return findall(init)
 end
 
+--- @class strsplit.opts
+--- @field init? number init pos
+
+--- Split string
+--- @param x string
+--- @param sep string
+--- @param opts? strsplit.opts
+--- @return string[]
 function strsplit(x, sep, opts)
   if sep == "" then
     local out = {}
@@ -181,18 +208,20 @@ function chomp(x)
   return _chomp(x) or x
 end
 
+--- Check if pattern matches at the beginning of the string
+--- @param x string
+--- @param s string 
+--- @return string?
 function startswith(x, s)
   return x:match("^" .. s)
 end
 
+--- Check if pattern matches at the end of the string
+--- @param x string
+--- @param s string 
+--- @return string?
 function endswith(x, s)
   return x:match(s .. "$")
 end
 
-string.startswith = startswith
-string.endswith = endswith
-string.findall = strfind
-string.ltrim = ltrim
-string.rtrim = rtrim
-string.trim = trim
-string.chomp = chomp
+split_string = strsplit
