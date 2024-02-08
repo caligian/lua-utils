@@ -233,11 +233,3 @@ function list.subset(x, y)
     return Set.items(res)
   end
 end
-
-dict.union = list.union
-dict.difference = list.difference
-dict.intersection = list.intersection
-dict.strict_superset = list.strict_superset
-dict.superset = list.superset
-dict.strict_subset = list.strict_subset
-dict.subset = list.subset
