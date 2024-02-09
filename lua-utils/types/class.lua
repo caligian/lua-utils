@@ -15,13 +15,12 @@ function get_class(x)
   end
 end
 
-local function assert_get_class(x, f)
+local function assert_get_class(x)
   local cls = get_class(x)
   if not cls then
     error("expected class or instance, got " .. dump(x))
   end
-
-  return f(cls)
+  return cls
 end
 
 local class_mt = { type = "class" }
@@ -82,48 +81,44 @@ end
 --- @param self class
 --- @return table?
 function class:get_static_methods()
-  local methods = mtget(self, "static")
-  if not methods then
-    return
-  end
+  return assert_get_class(self, function (cls)
+    local methods = mtget(cls, "static")
+    if not methods then
+      return
+    end
 
-  local out = {}
-  for name, _ in pairs(methods) do
-    out[name] = self[name]
-  end
+    local out = {}
+    for name, _ in pairs(methods) do
+      out[name] = cls[name]
+    end
 
-  return out
+    return out
+  end)
 end
 
 --- Is `name` a static method
 --- @param name string method name
 --- @return boolean
 function class:is_static_method(name)
-  local methods = mtget(self, "static_methods")
-  if methods then
-    return methods[name] and true
-  end
-  return false
+  return (mtget(assert_get_class(self), 'static') or {})[name] and true or false
 end
 
 function class:is_instance_method(name)
-  return not self:is_static_method(name) and self[name] and true
+  return not self:is_static_method(name) and self[name] and true or false
 end
 
 --- Get class name
 --- @param self class
 --- @return string?
 function class:get_class_name()
-  return mtget(get_class(self), "name")
+  return mtget(assert_get_class(self), 'name')
 end
 
 --- Get class parent
 --- @param self class
 --- @return table?
 function class:get_class_parent()
-  return assert_get_class(self, function(x)
-    return mtget(x, "parent")
-  end)
+  return mtget(assert_get_class(self), 'parent')
 end
 
 --- Is other a child of self
@@ -131,27 +126,22 @@ end
 --- @param other class
 --- @return class?
 function class:is_child_of(other)
-  return assert_get_class(other, function(other)
-    if not other then
+  other = assert_get_class(other) 
+  self = assert_get_class(self)
+
+  local self_parent = self:get_class_parent()
+  if not self_parent then
+    return
+  end
+
+  while self_parent ~= other do
+    self_parent = self_parent:get_class_parent()
+    if not self_parent then
       return
     end
+  end
 
-    return assert_get_class(self, function(self)
-      local self_parent = self:get_class_parent()
-      if not self_parent then
-        return
-      end
-
-      while self_parent ~= other do
-        self_parent = self_parent:get_class_parent()
-        if not self_parent then
-          return
-        end
-      end
-
-      return self
-    end)
-  end)
+  return self
 end
 
 --- Is other parent of self
@@ -166,7 +156,7 @@ end
 --- Check if other is a parent of self or self itself
 --- @param self class
 --- @param other class
---- @return class?
+--- @return class?, string?
 function class:is_a(other)
   if other == self then
     return other
@@ -174,12 +164,12 @@ function class:is_a(other)
 
   other = get_class(other) --[[@as class]]
   if not other then
-    return
+    return nil, 'expected other as class|instance, got ' .. dump(other)
   end
 
   self = get_class(self)
   if not self then
-    return
+    return nil, 'expected class|instance, got ' .. dump(self)
   end
 
   if self:get_class_parent() == other:get_class_parent() then
