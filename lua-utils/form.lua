@@ -17,6 +17,15 @@ require "lua-utils.types.typecheck"
 form = ns "form" --[[@as form]]
 
 local function equal(value, spec_value, display)
+  if is_method(spec_value) then
+    local ok, msg = spec_value(value)
+    if not ok then
+      msg = display .. ': '  .. (msg or 'callable failed for ' .. dump(obj)) 
+      error(msg)
+    end
+    return true
+  end
+
   local ok, msg = is_a(value, spec_value)
   if not ok then
     msg = msg or "expected " .. dump(spec_value) .. ", got " .. dump(value)
@@ -26,15 +35,17 @@ local function equal(value, spec_value, display)
   return true
 end
 
+
 --- Compare two items
 --- @param obj any
 --- @param spec any
 --- @see is_a
 --- @return any?
 function form.compare(obj, spec, _prefix)
-  if not is_table(obj) or not is_table(spec) then
-    equal(obj, spec, _prefix or "<base>")
-    return
+  _prefix = _prefix or '<base>'
+
+  if is_method(spec) or not is_table(spec) then
+    return equal(obj, spec, _prefix)
   end
 
   local later = {}
@@ -50,7 +61,6 @@ function form.compare(obj, spec, _prefix)
     key = tonumber(key) or key
     local value = obj[key]
     local display = prefix .. "." .. key
-
     if is_nil(value) and is_opt then
       return
     elseif is_method(spec_value) then
@@ -85,8 +95,8 @@ function form:__call(...)
   local objs = pack_tuple(...)
 
   return function(spec)
-    if not is_table(spec) then
-      error("expected a table as spec, got " .. dump(spec))
+    if is_method(spec) or not is_table(spec) then
+      spec = {spec}
     end
 
     for i = 1, #objs do

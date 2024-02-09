@@ -117,6 +117,7 @@ function union_mt:__call(...)
   local args = pack(...)
 
   return setmetatable({}, {
+    method = true,
     __call = function(self, obj, get_failed)
       local failed = is_union_of(obj, unpack(args))
       if failed == true then

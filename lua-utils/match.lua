@@ -1,5 +1,6 @@
 require "lua-utils.table"
 require "lua-utils.copy"
+require "lua-utils.form"
 
 --- @class case.rule
 --- @field [1] any `==` for literals, tables will be compared recursively and method() will be used as type assertion
@@ -607,8 +608,7 @@ local function case_call(specs)
 
       local function add_rule(rule)
         assert(#rule == 2, "expected {<spec>, <callable>}, got " .. dump(rule))
-
-        form[is_method].callable(rule[2])
+        form.method["rule[2]"](rule[2])
 
         local len = #self.case
         local name = rule.name or len + 1
@@ -682,7 +682,26 @@ function multimethod(specs)
   end
 
   function obj:M(sig, callback)
+    sig = list.mapi(sig, function (i, x)
+      if not case.is_var(x) then
+        if is_literal(x) then
+          return case.var(i, function (obj)
+            local ok = x == obj
+            if not ok then
+              return nil, 'expected ' .. dump(x) .. ', got ' .. dump(obj)
+            end
+            return obj
+          end)
+        end
+
+        return case.var(i, x)
+      end
+      x.name = i
+      return x
+    end)
+
     case_obj:add { conv(sig), callback, match = true }
+
     return obj
   end
 
@@ -709,11 +728,7 @@ function multimethod(specs)
       local cb = rule[2]
 
       if ok then
-        if not rule.match and not rule.capture then
-          return cb(unpack(ok))
-        end
-
-        return cb(ok)
+        return cb(unpack(ok))
       end
     end
 
@@ -726,6 +741,10 @@ end
 -- local mm = multimethod()
 -- local V = case.V
 
+-- mm:M({{ "A", "B", V(is_string), case.V(is_table) }, case.V(11), 2}, function(O, a, b)
+--   return O, a, b
+-- end)
+
 -- mm:C({ "A", "B", "C", { "DD" } }, function(O, a, b)
 --   return O, a, b
 -- end)
@@ -734,4 +753,4 @@ end
 --   return O, a, b
 -- end)
 
--- pp(mm({ 11111, 2, 3, { "d" } }, 1, 2))
+-- pp(mm({"A", "B", "C", {"DD"}}, 1, 2))

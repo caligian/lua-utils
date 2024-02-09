@@ -1,6 +1,6 @@
 require "lua-utils.string"
 require "lua-utils.table"
-require "lua-utils.types.form"
+-- require "lua-utils.form"
 
 --- @class Argparser
 --- @field args string[]
@@ -518,5 +518,3 @@ parser:on {
   type = "number",
   required = true,
 }
-
-print(parser:tostring())

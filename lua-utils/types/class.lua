@@ -15,16 +15,22 @@ function get_class(x)
   end
 end
 
+local function assert_get_class(x, f)
+  local cls = get_class(x)
+  if not cls then
+    error("expected class or instance, got " .. dump(x))
+  end
+
+  return f(cls)
+end
+
 local class_mt = { type = "class" }
 
 function class_mt:__newindex(key, value)
   if package.metatable_events[key] then
     class_mt[key] = value
   else
-    rawset(self, key, function(cls_or_inst, ...)
-      throw.cls_or_instance(is_class_object(cls_or_inst))
-      return value(get_class(cls_or_inst), ...)
-    end)
+    rawset(self, key, value)
   end
 end
 
@@ -65,10 +71,10 @@ end
 --- @return table<string,any>
 function class:get_attribs(exclude_callables)
   return dict.filter(self, function(key, value)
-    if exclude_callables and is_callable(value) then
+    if exclude_callables and is_method(value) or self:is_static_method(key) then
       return false
     end
-    return not non_class_attribs[key]
+    return value
   end)
 end
 
@@ -89,18 +95,35 @@ function class:get_static_methods()
   return out
 end
 
+--- Is `name` a static method
+--- @param name string method name
+--- @return boolean
+function class:is_static_method(name)
+  local methods = mtget(self, "static_methods")
+  if methods then
+    return methods[name] and true
+  end
+  return false
+end
+
+function class:is_instance_method(name)
+  return not self:is_static_method(name) and self[name] and true
+end
+
 --- Get class name
 --- @param self class
 --- @return string?
 function class:get_class_name()
-  return mtget(self, "name")
+  return mtget(get_class(self), "name")
 end
 
 --- Get class parent
 --- @param self class
 --- @return table?
 function class:get_class_parent()
-  return mtget(self, "parent")
+  return assert_get_class(self, function(x)
+    return mtget(x, "parent")
+  end)
 end
 
 --- Is other a child of self
@@ -108,25 +131,27 @@ end
 --- @param other class
 --- @return class?
 function class:is_child_of(other)
-  other = get_class(other) --[[@as class]]
-
-  if not other then
-    return
-  end
-
-  local self_parent = self:get_class_parent()
-  if not self_parent then
-    return
-  end
-
-  while self_parent ~= other do
-    self_parent = self_parent:get_class_parent()
-    if not self_parent then
+  return assert_get_class(other, function(other)
+    if not other then
       return
     end
-  end
 
-  return self
+    return assert_get_class(self, function(self)
+      local self_parent = self:get_class_parent()
+      if not self_parent then
+        return
+      end
+
+      while self_parent ~= other do
+        self_parent = self_parent:get_class_parent()
+        if not self_parent then
+          return
+        end
+      end
+
+      return self
+    end)
+  end)
 end
 
 --- Is other parent of self
@@ -167,10 +192,6 @@ end
 function class:__call(name, opts)
   throw.name(is_string(name))
 
-  if static then
-    throw.static(is_table(static))
-  end
-
   if opts then
     throw.opts(is_table(opts))
   end
@@ -181,6 +202,8 @@ function class:__call(name, opts)
   local include = opts.include
   local classmodmt = {}
   local classmod = mtset(copy.table(class)--[[@as table]], classmodmt)
+  static.init = true
+  static.super = true
   classmodmt.static = static
   classmodmt.parent = parent
   classmodmt.type = "class"
@@ -222,7 +245,8 @@ function class:__call(name, opts)
     if key == "super" then
       error("attempting to use .super() on instance: " .. dump(self))
     end
-    return self:get_class()[key]
+    local fn = self:get_class()[key]
+    return fn
   end
 
   function objmt:__newindex(key, value)
@@ -236,7 +260,9 @@ function class:__call(name, opts)
   function classmodmt:__newindex(key, value)
     if package:is_valid_event(key) then
       classmodmt[key] = value
-      objmt[key] = value
+      if key ~= "__index" and key ~= "__newindex" then
+        objmt[key] = value
+      end
     else
       rawset(self, key, value)
     end
@@ -247,9 +273,8 @@ function class:__call(name, opts)
     local static_methods = self:get_static_methods()
 
     --- @cast obj class
-
     for key, value in pairs(classmod) do
-      if not static_methods[key] and key ~= "init" and key ~= "super" then
+      if not static_methods[key] and (key ~= "init" and key ~= "super") then
         obj[key] = value
       end
     end
@@ -282,3 +307,7 @@ end
 --   self.p_y = y
 --   return P:super(self, x, y)
 -- end
+
+-- local p = P(1, 2)
+-- local g = G(3, 4)
+-- pp(p:is_a(g))
