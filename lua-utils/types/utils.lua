@@ -456,22 +456,25 @@ function is_class(x)
 end
 
 function is_instance(x)
-  local mt = mtget(x)
-  local fail = not mt or not mt.type or not mt.class or not mt.instance or not is_class(mt.class)
+  local ok, msg = is_table(x)
+  if not ok then return nil, msg end
 
-  if fail then
-    return nil, "expected instance, got " .. dump(x)
+  local mt = mtget(x) or {}
+  if mt.instance and mt.class and is_class(mt.class) then
+    return x
   end
 
-  return x
+  return nil, "expected instance, got " .. dump(x)
 end
 
 function is_class_object(x)
-  local ok = is_class(x) or is_instance(x) and x
-  if not ok then
-    return nil, "expected class or instance, got " .. dump(x)
+  if is_class(x) then
+    return x
+  elseif is_instance(x) then
+    return x
   end
-  return x
+
+  return nil, "expected class or instance, got " .. dump(x)
 end
 
 --- Check if args are a function or method (table with mt.__call and mt.method = true)
