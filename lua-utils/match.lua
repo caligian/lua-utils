@@ -510,17 +510,6 @@ function case.P(spec, callback)
   return { spec, callback, cond = true }
 end
 
-function case.R(callback, ...)
-  local args = { ... }
-
-  for i = 1, #args do
-    args[i] = totable(args[i])
-    args[i][2] = callback
-  end
-
-  return mtset(args, { type = "case.range" })
-end
-
 local function case_call(specs)
   --- @type case
   local case_obj = mtset({
@@ -583,22 +572,6 @@ local function case_call(specs)
       end
     end,
 
-    add_any = function(self, f, ...)
-      local rules = case.R(f, ...)
-
-      for i = 1, #rules do
-        local rule = rules[i]
-
-        if rule.name then
-          self.rules[rule.name] = rule
-        end
-
-        self.case[#self.case + 1] = rule
-      end
-
-      return self
-    end,
-
     from_list = function(self, _specs)
       return self:add(unpack(_specs))
     end,
@@ -619,12 +592,7 @@ local function case_call(specs)
       for i = 1, #args do
         local rule = args[i]
         form.table.rule(rule)
-
-        if typeof(rule) == "case.range" then
-          list.each(rule, add_rule)
-        else
-          add_rule(rule)
-        end
+        add_rule(rule)
       end
 
       return self
