@@ -1,10 +1,9 @@
 require "lua-utils.types.utils"
 
-local default_types = {}
-for key, fun in pairs(_G) do
-  if key:match "^is_" and key ~= "is_a" then
-    default_types[key] = fun
-  end
+local default_types = package.guards
+
+function defguard(name, fn)
+  return package.guards:create(name, fn)
 end
 
 local union_mt = {type = 'union', method = true}

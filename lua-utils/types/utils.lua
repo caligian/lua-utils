@@ -483,12 +483,13 @@ end
 function is_method(...)
   local is_f = is_function
   local is_t = is_table
+  local err = 'expected function or table with mt.method and mt.__call<method|function>, got '
 
   local function recursive_check(x)
     if is_f(x) then
       return x
     elseif not is_t(x) then
-      return nil, 'expected table or function, got ' .. dump(x)
+      return nil, err .. dump(x)
     end
 
     local mt = mtget(x) or {}
@@ -496,19 +497,10 @@ function is_method(...)
       return x
     end
 
-    return nil, 'expected table with mt.method and mt.__call<method|function>, got ' .. dump(x)
+    return nil,  err .. dump(x)
   end
 
-  local args = {...}
-  local nargs = #args
-
-  if nargs == 1 then
-    return recursive_check(args[1])
-  elseif nargs ~= 2 then
-    return nil, 'expected <function>|<table>, <field>, got ' .. dump(args)
-  end
-
-  return recursive_check(unpack(args))
+  return recursive_check(...)
 end
 
 --- Define a method object. This is useful for differentiating instances and types from methods
@@ -547,3 +539,64 @@ function defn(...)
   error('expected table with at least 1 value, got ' .. dump(args))
 end
 
+function tolist(x, force)
+	if force then return {x}
+	elseif is_method(x) or not is_table(x) then return {x}
+	else return x
+	end
+end
+
+package.guards = { guards = {} }
+
+function package.guards:get(name)
+  name = name:gsub('^is_', '')
+  throw.name(is_string(name))
+
+  if not self.guards[name] then
+    local Gfn = _G['is_' .. name]
+    if Gfn then
+      self.guards[name] = Gfn
+			self.guards['is_' .. name] = Gfn
+      return self.guards[name]
+    end
+  end
+
+  return self.guards[name], name
+end
+
+--- @param name string
+--- @param fn method
+--- @param table
+function package.guards:create(name, fn)
+  if not fn then
+    fn, name = self:get(name)
+  else
+    name = name:gsub('^is_', '')
+  end
+
+  throw.fn(is_method(fn))
+
+  self.guards[name] = fn
+  _G['is_' .. name] = fn
+
+  return self 
+end
+
+function package.guards:remove(name)
+  throw.name(is_string(name))
+
+  name = name:gsub('^is_', '')
+  self.guards[name] = nil
+  _G['is_' .. name] = nil
+
+  return self
+end
+
+mtset(package.guards, {
+  __index = function (self, name)
+    return self:get(name)
+  end,
+  __newindex = function (self, name, fn)
+    return self:create(name, fn)
+  end
+})

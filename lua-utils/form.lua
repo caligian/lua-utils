@@ -1,6 +1,6 @@
 require "lua-utils.table"
 require "lua-utils.string"
-require "lua-utils.types.typecheck"
+require "lua-utils.types"
 
 --- @class form
 --- > form.string.opts(opts or 'nil')

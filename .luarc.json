@@ -1,0 +1,7 @@
+{
+    "diagnostics.disable": [
+        "lowercase-global",
+        "undefined-global",
+        "ambiguity-1"
+    ]
+}
