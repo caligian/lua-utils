@@ -787,28 +787,31 @@ function multimethod(specs)
   return obj
 end
 
--- local mm = multimethod()
--- local V = case.V
+--[[
+local mm = multimethod()
+local V = case.V
 
--- local f = function(self, a, b, c)
---   return { opts = { a, b, c } }
--- end
+local f = function(self, a, b, c)
+  return { opts = { a, b, c } }
+end
 
--- local g = function(self, a, b)
---   return self:another_name(a, b)
--- end
+local g = function(self, a, b)
+  return self:another_name(a, b)
+end
 
--- mm:M(V "a", "b", V "c").another_name(f)
--- mm:M("A", "B").name(g)
+mm:M(V "a", "b", V "c").another_name(f)
 
--- mm:M(
---   { a = V "a", b = V "b", c = { d = is_number } },
---   1,
---   2,
---   "hello_world"
--- ).yet_another(function(_, opts, a, b, c)
---   return { opts = opts, a = a, b = b, c = c }
--- end)
+mm:M("A", "B").name(g)
 
--- pp(mm({ a = 1, b = 2, c = { d = 1 } }, 1, 2, "hello_world"))
--- pp(is_method(mm))
+mm:M(
+  { a = V "a", b = V "b", c = { d = is_number } },
+  1,
+  2,
+  "hello_world"
+).yet_another(function(_, opts, a, b, c)
+  return { opts = opts, a = a, b = b, c = c }
+end)
+
+pp(mm({ a = 1, b = 2, c = { d = 1 } }, 1, 2, "hello_world"))
+pp(is_method(mm))
+--]]

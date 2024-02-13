@@ -56,6 +56,22 @@ function class:get_super_method()
   error("no init defined for " .. dump(self))
 end
 
+function super(obj, ...)
+  throw.obj(is_instance(obj))
+
+  local cls = mtget(obj, 'class')
+  local init = cls:get_super_method()
+  if not init then
+    return
+  end
+
+  return init(obj, ...)
+end
+
+function class:super(...)
+  return super(self, ...)
+end
+
 function class:include(other)
   if not is_ns(other) or not is_class(other) then
     error('expected other to be a namespace or a class, got ' .. dump(other))
@@ -66,15 +82,6 @@ function class:include(other)
   end
 
   return self
-end
-
---- Use init method on and instance
---- @param self class
---- @param obj table
---- @param ... any
-function class:super(obj, ...)
-  local super_fn = self:get_super_method()
-  return super_fn(obj, ...)
 end
 
 --- Get attributes w/o callables
@@ -238,8 +245,6 @@ function class:__call(name, opts)
   local include = opts.include
   local classmodmt = {}
   local classmod = mtset(copy.table(class)--[[@as table]], classmodmt)
-  static.init = true
-  static.super = true
   classmodmt.static = static
   classmodmt.parent = parent
   classmodmt.type = "class"
@@ -320,20 +325,3 @@ function class:__call(name, opts)
 
   return classmod
 end
-
--- local G = class "Grandpa"
--- G.g_a = 1
--- G.g_b = 2
-
--- function G:init(x, y)
---   self.g_x = x
---   self.g_y = y
---   return self
--- end
-
--- local P = class("Pa", { parent = G })
--- function P:init(x, y)
---   self.p_x = x
---   self.p_y = y
---   return P:super(self, x, y)
--- end
