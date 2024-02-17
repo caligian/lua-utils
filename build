@@ -1,1 +1,3 @@
-luarocks --local build
+dst=~/.config/nvim/lua/lua-utils
+[[ -d $dst ]] && rm -rf $dst
+cp -rv lua-utils/ $dst

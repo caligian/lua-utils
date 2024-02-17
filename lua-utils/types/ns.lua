@@ -16,7 +16,7 @@ function ns_mt:__call(name)
 end
 
 function ns_mt:__newindex(key, value)
-  if package:is_valid_event(key) then
+  if package.is_valid_event(key) then
     mtset(self, key, value)
   else
     rawset(self, key, value)
@@ -24,7 +24,7 @@ function ns_mt:__newindex(key, value)
 end
 
 function ns_mt:__index(key)
-  if package:is_valid_event(key) then
+  if package.is_valid_event(key) then
     return mtget(self, key)
   end
 end
@@ -46,7 +46,7 @@ end
 --- @return table<any,function>
 function ns:get_methods()
   return dict.filter(self, function(_, value)
-    return is_callable(value)
+    return is_method(value)
   end)
 end
 
@@ -61,7 +61,7 @@ function ns:get_method(name, inst_method)
     return nil, "invalid method name " .. dump(fn)
   end
 
-  assert(is_callable(f))
+  assert(is_method(f))
 
   if inst_method then
     return function(...)

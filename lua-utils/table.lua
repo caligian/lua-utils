@@ -885,7 +885,7 @@ end
 function list.partition(x, fun_or_num)
   assert_is_a(fun_or_num, union("number", "callable"))
 
-  if is_callable(fun_or_num) then
+  if is_method(fun_or_num) then
     local result = { {}, {} }
 
     for i = 1, #x do

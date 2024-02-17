@@ -132,7 +132,7 @@ local function gmatch(s, repl)
   local before = C((1 - paren_open) ^ 0 + nl)
   local chars = C((1 - paren_close) ^ 1 + nl)
     / function(x)
-      if is_callable(repl) then
+      if is_method(repl) then
         return repl(x)
       end
 

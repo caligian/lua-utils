@@ -1,41 +1,35 @@
 require "lua-utils.types.utils"
 
-local default_types = package.guards
+local default_types = guards
 
 function defguard(name, fn)
-  return package.guards:create(name, fn)
+  return guards.create(name, fn)
 end
 
-local union_mt = {type = 'union', method = true}
-union = mtset({}, union_mt)
 
-function union._match_else(value, spec)
+--------------------------------------------------
+local Union_mt = {type = 'union', method = true}
+local Union = mtset({}, Union_mt)
+
+function Union._match_else(value, spec)
   local ok = value == spec
   if not ok then
     return false, dump(spec)
   end
-
   return value
 end
 
-function union._match_fun(value, spec)
+function Union._match_fun(value, spec)
   local ok, msg = spec(value)
   if not ok then
     return false, msg or "callable failed for " .. dump(value)
   end
-
   return value
 end
 
-function union._match_table(value, spec)
+function Union._match_table(value, spec)
   if value == spec then
     return value
-  elseif is_method(spec) then
-    local ok, failed = spec(value, true)
-    if ok then
-      return true
-    end
-    return false, failed
   elseif not is_table(value) then
     return false, typeof(spec)
   elseif is_ns(spec) or is_class_object(spec) then
@@ -56,16 +50,14 @@ function union._match_table(value, spec)
   return value
 end
 
-function union._match_string(value, spec)
-  local found = default_types["is_" .. spec]
+function Union._match_string(value, spec)
+  local found = guards.guards["is_" .. spec]
   if found then
     local ok = found(value)
     if not ok then
       return false, spec
     end
     return value
-  elseif not is_table(value) then
-    return false, spec
   end
 
   ok = typeof(value) == spec
@@ -76,15 +68,15 @@ function union._match_string(value, spec)
   return value
 end
 
-function union.match(value, spec)
+function Union.match(value, spec)
   if is_string(spec) then
-    return union._match_string(value, spec)
-  elseif is_function(spec) then
-    return union._match_fun(value, spec)
+    return Union._match_string(value, spec)
+  elseif is_method(spec) then
+    return Union._match_fun(value, spec)
   elseif is_table(spec) then
-    return union._match_table(value, spec)
+    return Union._match_table(value, spec)
   end
-  return union._match_else(value, spec)
+  return Union._match_else(value, spec)
 end
 
 local function is_union_of(value, ...)
@@ -92,7 +84,7 @@ local function is_union_of(value, ...)
   local check = { ... }
 
   for i = 1, #check do
-    local ok, msg = union.match(value, check[i])
+    local ok, msg = Union.match(value, check[i])
     if not ok then
       if is_table(msg) then
         for i = j, #msg do
@@ -109,10 +101,10 @@ local function is_union_of(value, ...)
   return failed
 end
 
---- Return a function that checks union of types ...
+--- Return a function that checks Union of types ...
 --- @param ... string|function|table
 --- @return fun(x): boolean, string?
-function union_mt:__call(...)
+function Union_mt:__call(...)
   local args = pack(...)
 
   return setmetatable({}, {
@@ -131,16 +123,16 @@ function union_mt:__call(...)
       end
 
       if l == 1 then
-        return false, "expected " .. failed[1] .. ", got " .. dump(value)
+        return false, "expected " .. failed[1] .. ", got " .. dump(obj)
       end
 
       ---@diagnostic disable-next-line
       failed = join(failed, ", ")
-      local msg = "expected any of " .. failed .. ", got " .. dump(value)
+      local msg = "expected any of " .. failed .. ", got " .. dump(obj)
 
       return false, msg
     end,
-    type = "union",
+    type = 'union',
   })
 end
 
@@ -150,7 +142,7 @@ end
 --- > form 1: is_a[<type_sig: function|string|table|object|any>](<obj>, assert_type?)
 --- > form 2: is_a(<type_sig: function|string|table|object|any>, <obj>, assert_type?)
 --- > is_a.string(1, true) -- will throw an error
---- > is_a[union('string', 'number')](1) -- this will succeed
+--- > is_a[Union('string', 'number')](1) -- this will succeed
 --- > is_a(<obj>, <spec>)
 --- > is_a(1, function (x)
 --- >   local ok = x > 2
@@ -172,7 +164,7 @@ is_a = mtset({}, {
     return is_a[expected](obj)
   end,
   __index = function (_, key)
-    local f = typeof(key) ~= 'union' and union(key) or key
+    local f = typeof(key) ~= 'union' and Union(key) or key
     return function(obj, ass)
       local ok, msg = f(obj)
       if not ok then
@@ -196,3 +188,5 @@ assert_is_a = mtset({}, {
 		return is_a(obj, expected, true)
 	end,
 })
+
+union = Union

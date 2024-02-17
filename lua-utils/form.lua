@@ -20,7 +20,7 @@ local function equal(value, spec_value, display)
   if is_method(spec_value) then
     local ok, msg = spec_value(value)
     if not ok then
-      msg = display .. ': '  .. (msg or 'callable failed for ' .. dump(obj)) 
+      msg = display .. ': '  .. (msg or 'callable failed for ' .. dump(value)) 
       error(msg)
     end
     return true
@@ -29,7 +29,7 @@ local function equal(value, spec_value, display)
   local ok, msg = is_a(value, spec_value)
   if not ok then
     msg = msg or "expected " .. dump(spec_value) .. ", got " .. dump(value)
-    msg = display .. ":" .. msg
+    msg = display .. ": " .. msg
     error(msg)
   end
   return true
@@ -128,3 +128,4 @@ end
 function params(...)
   return form(...)
 end
+

@@ -35,13 +35,14 @@ end
 
 --- Create a class ns to create instances
 --- @class class
+--- @overload fun(...: any): class
 class = setmetatable({}, class_mt)
 class.get_class = get_class
 
 --- Get the nearest .init() method for class. Throws an error when no init method is found
 --- @param self class
 --- @return function
-function class:get_super_method()
+function class.get_super_method(self)
   local _parent = self:get_class_parent()
 
   while _parent do
@@ -68,11 +69,11 @@ function super(obj, ...)
   return init(obj, ...)
 end
 
-function class:super(...)
+function class.super(self, ...)
   return super(self, ...)
 end
 
-function class:include(other)
+function class.include(self, other)
   if not is_ns(other) or not is_class(other) then
     error('expected other to be a namespace or a class, got ' .. dump(other))
   end
@@ -87,7 +88,7 @@ end
 --- Get attributes w/o callables
 --- @param exclude_callables? boolean
 --- @return table<string,any>
-function class:get_class_attribs(exclude_callables)
+function class.get_class_attribs(self, exclude_callables)
   assert(is_class_object(self))
 
   local out = {}
@@ -100,7 +101,7 @@ function class:get_class_attribs(exclude_callables)
   return out
 end
 
-function class:get_class_attrib(name)
+function class.get_class_attrib(self, name)
   assert(is_class(self) or is_instance(self), dump(self))
   local found = rawget(self, name)
 
@@ -117,7 +118,7 @@ end
 --- Get static methods for class
 --- @param self class
 --- @return table?
-function class:get_static_methods()
+function class.get_static_methods(self)
   local cls = assert_get_class(self)
   local methods = mtget(cls, "static")
   if not methods then
@@ -134,7 +135,10 @@ function class:get_static_methods()
   return out
 end
 
-function class:get_instance_methods()
+--- Get instance methods
+--- @param self class
+--- @return table<any,function>
+function class.get_instance_methods(self)
   assert(is_class_object(self))
 
   local cls = assert_get_class(self)
@@ -152,25 +156,29 @@ end
 --- Is `name` a static method
 --- @param name string method name
 --- @return boolean
-function class:is_static_method(name)
+function class.is_static_method(self, name)
   return (mtget(assert_get_class(self), "static") or {})[name] and true or false
 end
 
-function class:is_instance_method(name)
+--- Is `name` an instance method
+--- @param self class
+--- @param name string
+--- @return boolean
+function class.is_instance_method(self, name)
   return not self:is_static_method(name) and self[name] and true or false
 end
 
 --- Get class name
 --- @param self class
 --- @return string?
-function class:get_class_name()
+function class.get_class_name(self)
   return mtget(assert_get_class(self), "name")
 end
 
 --- Get class parent
 --- @param self class
 --- @return table?
-function class:get_class_parent()
+function class.get_class_parent(self)
   return mtget(assert_get_class(self), "parent")
 end
 
@@ -178,7 +186,7 @@ end
 --- @param self class
 --- @param other class
 --- @return class?
-function class:is_child_of(other)
+function class.is_child_of(self, other)
   other = assert_get_class(other)
   self = assert_get_class(self)
 
@@ -201,7 +209,7 @@ end
 --- @param self class
 --- @param other class
 --- @return class?
-function class:is_parent_of(other)
+function class.is_parent_of(self, other)
   ---@diagnostic disable-next-line: param-type-mismatch
   return class.is_child_of(other, self)
 end
@@ -210,7 +218,7 @@ end
 --- @param self class
 --- @param other class
 --- @return class?, string?
-function class:is_a(other)
+function class.is_a(self, other)
   if other == self then
     return other
   end
@@ -285,7 +293,7 @@ function class:__call(name, opts)
   end
 
   function objmt:__newindex(key, value)
-    if package:is_valid_event(key) then
+    if package.is_valid_event(key) then
       objmt[key] = value
     else
       rawset(self, key, value)
@@ -293,7 +301,7 @@ function class:__call(name, opts)
   end
 
   function classmodmt:__newindex(key, value)
-    if package:is_valid_event(key) then
+    if package.is_valid_event(key) then
       classmodmt[key] = value
       if key ~= "__index" and key ~= "__newindex" then
         objmt[key] = value
@@ -305,6 +313,7 @@ function class:__call(name, opts)
 
   function classmodmt:__call(...)
     local obj = mtset({}, objmt)
+    --- @cast obj class
     local static_methods = self:get_static_methods()
 
     --- @cast obj class
@@ -323,5 +332,5 @@ function class:__call(name, opts)
     end
   end
 
-  return classmod
+  return classmod--[[@as class]]
 end

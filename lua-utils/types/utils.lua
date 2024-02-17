@@ -3,13 +3,11 @@ require "lua-utils.copy"
 inspect = require "inspect"
 inspect = inspect.inspect
 
---- @alias method function|table
-
 --- Dump object
 --- @param x any
 --- @return string
 function dump(x)
-  if type(x) == 'string' or type(x) == 'number' then
+  if type(x) == "string" or type(x) == "number" then
     return x
   end
   return inspect(x)
@@ -46,7 +44,7 @@ package.metatable_events = mtkeys
 --- Is event a valid metatable event?
 --- @param event string
 --- @return boolean
-function package:is_valid_event(event)
+function package.is_valid_event(event)
   return package.metatable_events[event] and true or false
 end
 
@@ -116,177 +114,6 @@ function totable(x, force)
   end
 end
 
-to_table = totable
-to_string = tostring
-to_number = tonumber
-
---- Return type based on lua type or <metatable>.type
---- @param x any
---- @return string?
-function typeof(x)
-  local x_type = type(x)
-
-  if x_type ~= "table" then
-    return x_type
-  elseif is_list(x) then
-    return "list"
-  end
-
-  local x_mt = getmetatable(x)
-  if not x_mt then
-    return "table"
-  elseif not x_mt.type then
-    return "table"
-  else
-    return x_mt.type
-  end
-end
-
---- Is x a string?
---- @param x any
---- @return boolean,string?
-function is_string(x)
-  local ok = type(x) == "string"
-  local msg = "expected string, got " .. dump(x)
-
-  if not ok then
-    return false, msg
-  end
-
-  return true
-end
-
---- Is x a table?
---- @param x any
---- @return boolean,string?
-function is_table(x)
-  local ok = type(x) == "table"
-
-  if not ok then
-    local msg = "expected table, got " .. dump(x)
-    return false, msg
-  end
-
-  return true
-end
-
---- Is x a function?
---- @param x any
---- @return boolean,string?
-function is_function(x)
-  local ok = type(x) == "function"
-  local msg = "expected function, got " .. dump(x)
-
-  if not ok then
-    return false, msg
-  end
-
-  return true
-end
-
---- Is x a userdata?
---- @param x any
---- @return boolean,string?
-function is_userdata(x)
-  local ok = type(x) == "userdata"
-
-  if not ok then
-    local msg = "expected userdata, got " .. dump(x)
-    return false, msg
-  end
-
-  return true
-end
-
---- Is x a thread?
---- @param x any
---- @return boolean,string?
-function is_thread(x)
-  local ok = type(x) == "thread"
-  local msg = "expected thread, got " .. dump(x)
-
-  if not ok then
-    return false, msg
-  end
-
-  return true
-end
-
---- Is x a boolean?
---- @param x any
---- @return boolean,string?
-function is_boolean(x)
-  local ok = type(x) == "boolean"
-
-  if not ok then
-    local msg = "expected boolean, got " .. dump(x)
-    return false, msg
-  end
-
-  return true
-end
-
---- Is x a number?
---- @param x any
---- @return boolean,string?
-function is_number(x)
-  local ok = type(x) == "number"
-
-  if not ok then
-    local msg = "expected number, got " .. dump(x)
-    return false, msg
-  end
-
-  return true
-end
-
---- Is x a function (__call is nonnil or x is a function)?
---- @param x any
---- @return boolean,string?
-function is_callable(x)
-  local tp = type(x)
-
-  if tp == "function" then
-    return true
-  elseif tp ~= "table" then
-    return false, "expected table|function, got " .. dump(tp)
-  end
-
-  local mt = getmetatable(x)
-  if not mt then
-    return false, "metatable missing"
-  end
-
-  local ok = mt.__call ~= nil
-  if not ok then
-    return false, "__call metamethod missing"
-  end
-
-  return true
-end
-
---- Is x nil
---- @param x any
---- @return boolean
-function is_nil(x)
-  return x == nil
-end
-
---- Is empty?
---- @param x string|list
---- @return boolean
-function is_empty(x)
-  local x_type = type(x)
-
-  if x_type == "string" then
-    return #x == 0
-  elseif x_type ~= "table" then
-    return false
-  end
-
-  return size(x) == 0
-end
-
 --- Return length of string|non-lists
 --- @param t string|table
 --- @return integer?
@@ -305,85 +132,6 @@ function size(t)
   end
 
   return n
-end
-
---- Check if a X is a nonempty list of elements
---- @param x any[] x should not have a metatable unless the latter is defined
---- @param list_like? boolean skip metatable check
---- @return any[]|false
---- @return string? message failure message
-function is_list(x, list_like)
-  if not is_table(x) then
-    return false, "expected table, got " .. dump(x)
-  end
-
-  local mt = not list_like and getmetatable(x)
-  if mt and mt.type ~= "list" then
-    return false, "expected list, got " .. dump(x)
-  end
-
-  local len = size(x)
-  if len == 0 then
-    return false, "expected list, got empty table"
-  end
-
-  local ok = len == #x
-  if not ok then
-    return false, "expected list, got dict"
-  end
-
-  return x
-end
-
---- Check if a X is a nonempty table that is not a list
---- @param x table x should not have a metatable unless the latter is defined
---- @param dict_like? boolean skip metatable check
---- @return table|false
---- @return string? message failure message
-function is_dict(x, dict_like)
-  if not is_table(x) then
-    return false, "expected table, got " .. dump(x)
-  elseif not dict_like then
-    local mt = getmetatable(x)
-    if mt then
-      if mt.type == "dict" then
-        return x
-      elseif mt.type ~= nil then
-        return false, "expected dict, got " .. dump(x)
-      end
-    end
-  end
-
-  local len = size(x)
-  if len == 0 then
-    return false, "expected dict, got empty table"
-  elseif len == #x then
-    return false, "expected dict, got list " .. dump(x)
-  else
-    return x
-  end
-end
-
---- Check if self is an instance
---- @param self table
---- @return table? self self
---- @return string? message error message
-function is_instance(self)
-  local inst, msg = mtget(self, instance)
-
-  if not inst then
-    return nil, msg or ("expected object, got " .. dump(self))
-  end
-
-  return self
-end
-
---- Check if x is an literal
---- Literals as in string, number and boolean
---- @param x string|number|boolean
---- @return (string|number|boolean)?
-function is_literal(x)
-  return (is_string(x) or is_number(x) or is_boolean(x)) and x
 end
 
 --- Get table reference string. This will temporarily modify tables with custom __tostring methods
@@ -407,111 +155,38 @@ function ref(x)
   return id
 end
 
---- Check if x and y point to the same object
---- @param x table
---- @param y table
---- @return boolean
-function sameref(x, y)
-  return ref(x) == ref(y)
-end
+do
+  local mt = {}
+  --- Throw error if test fails like assert but with a name
+  --- > throw.variable_name(is_table(1)) -- variable_name: expected table, got "1"
+  --- @overload fun(name: string, test: boolean, msg?: string)
+  throw = setmetatable({}, mt)
 
-local throw_mt = {}
---- Throw error if test fails like assert but with a name
---- > throw.variable_name(is_table(1)) -- variable_name: expected table, got "1"
---- @overload fun(name: string, test: boolean, msg?: string)
-throw = setmetatable({}, throw_mt)
-
-function throw_mt:__call(name, test, msg)
-  if not test then
-    name = type(name) == "string" and name or dump(name)
-    error(dump(name) .. ": " .. debug.traceback(msg or "", 3))
-  end
-end
-
-function throw_mt:__index(name)
-  return function(obj, msg)
-    return throw(name, obj, msg)
-  end
-end
-
---- Is ns?
---- @param x any
---- @return boolean,string?
-function is_ns(x)
-  local ok = typeof(x) == "ns"
-
-  if not ok then
-    return false, "expected ns, got " .. dump(x)
-  end
-
-  return x
-end
-
-function is_class(x)
-  local ok = typeof(x) == "class"
-  if not ok then
-    return nil, "expected class, got " .. dump(x)
-  end
-  return x
-end
-
-function is_instance(x)
-  local ok, msg = is_table(x)
-  if not ok then return nil, msg end
-
-  local mt = mtget(x) or {}
-  if mt.instance and mt.class and is_class(mt.class) then
-    return x
-  end
-
-  return nil, "expected instance, got " .. dump(x)
-end
-
-function is_class_object(x)
-  if is_class(x) then
-    return x
-  elseif is_instance(x) then
-    return x
-  end
-
-  return nil, "expected class or instance, got " .. dump(x)
-end
-
---- Check if args are a function or method (table with mt.__call and mt.method = true)
---- @overload fun(mod: table, f: string): function?, string?
---- @overload fun(obj: table|function): (table|function)?, string?
-function is_method(...)
-  local is_f = is_function
-  local is_t = is_table
-  local err = 'expected function or table with mt.method and mt.__call<method|function>, got '
-
-  local function recursive_check(x)
-    if is_f(x) then
-      return x
-    elseif not is_t(x) then
-      return nil, err .. dump(x)
+  function mt:__call(name, test, msg)
+    if not test then
+      name = type(name) == "string" and name or dump(name)
+      error(
+        dump(name) .. ": " .. debug.traceback(msg or "", 3)
+      )
     end
-
-    local mt = mtget(x) or {}
-    if mt.__call and mt.method and recursive_check(mt.__call) then
-      return x
-    end
-
-    return nil,  err .. dump(x)
   end
 
-  return recursive_check(...)
+  function mt:__index(name)
+    return function(obj, msg)
+      return throw(name, obj, msg)
+    end
+  end
 end
 
 --- Define a method object. This is useful for differentiating instances and types from methods
 --- @overload fun(fn: method): table
 --- @overload fun(mod: table, fn: method): table
 function defn(...)
-  local args = {...}
+  local args = { ... }
   local nargs = #args
 
   local function create(f, obj)
-    local mt = {method = true}
+    local mt = { method = true }
     obj = mtset(obj or {}, mt)
 
     function mt:__call(...)
@@ -536,67 +211,367 @@ function defn(...)
     return create(f, m)
   end
 
-  error('expected table with at least 1 value, got ' .. dump(args))
+  error(
+    "expected table with at least 1 value, got "
+      .. dump(args)
+  )
 end
 
-function tolist(x, force)
-	if force then return {x}
-	elseif is_method(x) or not is_table(x) then return {x}
-	else return x
-	end
-end
+--- User defined guards
+--- @class guards
+--- @overload fun(name: string, fn: function): function
+guards = {}
+do
+  guards = {
+    --- Contains all the guards created hashed by string
+    guards = {} --[[@as table<string,function>]],
 
-package.guards = { guards = {} }
+    get = function(name)
+      throw.name(
+        type(name) == "string",
+        "expected string, got " .. dump(name)
+      )
 
-function package.guards:get(name)
-  name = name:gsub('^is_', '')
-  throw.name(is_string(name))
+      local exists = self.guards[name]
+        or self.guards["is_" .. name]
+      if exists then
+        return exists
+      end
 
-  if not self.guards[name] then
-    local Gfn = _G['is_' .. name]
-    if Gfn then
+      local Gfn = _G["is_" .. name]
+      if not Gfn then
+        return
+      end
+
       self.guards[name] = Gfn
-			self.guards['is_' .. name] = Gfn
-      return self.guards[name]
+      self.guards["is_" .. name] = Gfn
+
+      return self.guards[name], name
+    end,
+
+    create = function(name, fn, message)
+      if not fn then
+        fn, name = checker.get(name)
+      else
+        name = name:gsub("^is_", "")
+      end
+
+      throw.fn(
+        type(fn) == "function" or mtget(fn, "method"),
+        "expected method, got " .. dump(fn)
+      )
+
+      local checker = {
+        test = fn,
+        dump = function(x)
+          if not fn(x) then
+            local mt = mtget(x)
+
+            if mt then
+              local has_tp = mt.type or 'table'
+              local ismethod = mt.method
+              local isinst = mt.instance
+              local msg
+
+              if isinst then
+                msg = string.format(
+                  "%s\nvalue: <%s: instance> %s",
+                  message,
+                  has_tp,
+                  dump(x)
+                )
+              elseif ismethod then
+                msg = string.format(
+                  "%s\nvalue: <method> %s",
+                  message,
+                  dump(x)
+                )
+              else
+                msg = string.format(
+                  "%s\nvalue: <%s> %s",
+                  message,
+                  has_tp,
+                  dump(x)
+                )
+              end
+
+              return false, msg
+            end
+
+            local msg = string.format(
+              "%s\nvalue: <%s> %s",
+              message,
+              type(x),
+              dump(x),
+              x
+            )
+            return false, msg
+          end
+
+          return true
+        end,
+      }
+
+      function checker.assert(x)
+        assert(checker.dump(x))
+      end
+
+      checker.opt = {
+        dump = function(x)
+          if x == nil then
+            return true
+          end
+          return checker.dump(x)
+        end,
+        assert = function(x)
+          if x == nil then
+            return true
+          end
+          return checker.assert(x)
+        end,
+      }
+
+      mtset(checker, {
+        __call = function(_, obj, opts)
+          opts = opts or {}
+          if opts.opt and obj == nil then
+            return true
+          elseif opts.dump then
+            if opts.assert then
+              assert(checker.dump(obj))
+            else
+              return checker.dump(obj)
+            end
+          elseif opts.assert then
+            assert(checker.dump(obj))
+          else
+            return fn(obj)
+          end
+        end,
+        __index = function(_, prefix)
+          return function(obj, opts)
+            return checker(obj, opts)
+          end
+        end,
+        method = true,
+      })
+
+      guards.guards[name] = checker
+      guards.guards['is_' .. name] = checker
+      _G["is_" .. name] = checker
+
+      return self
+    end,
+  }
+
+  local mt = {
+    type = "ns",
+    __newindex = function(self, name, fn)
+      local create = rawget(self, "create")
+      return create(self, name, fn)
+    end,
+    __call = function(self, ...)
+      return self:create(...)
+    end,
+    guards = guards.guards,
+  }
+
+  local function mkbuiltin(tp, fn)
+    guards.create(tp, fn or function(x)
+      return type(x) == tp
+    end, string.format("expected type %s", tp))
+  end
+
+  local builtin = {
+    "table",
+    "string",
+    "number",
+    "userdata",
+    "function",
+    "thread",
+    "boolean",
+  }
+
+  for i = 1, #builtin do
+    mkbuiltin(builtin[i])
+  end
+
+  local maker = mtset({}, {
+    __newindex = function(_, name, fn)
+      local message = name:gsub("^is_", "")
+      mkbuiltin(name, fn)
+    end,
+  })
+
+  function maker.is_nil(x)
+    return x == nil
+  end
+
+  function maker.empty(x)
+    local x_type = type(x)
+
+    if x_type == "string" then
+      return #x == 0
+    elseif x_type ~= "table" then
+      return false
+    end
+
+    return size(x) == 0
+  end
+
+  function maker.ns(x)
+    return typeof(x) == "ns"
+  end
+
+  function maker.class(x)
+    return typeof(x) == "class"
+  end
+
+  function maker.instance(x)
+    if not is_table(x) then
+      return false
+    end
+
+    local mt = mtget(x) or {}
+    if mt.instance and mt.class and is_class(mt.class) then
+      return true
+    end
+
+    return false
+  end
+
+  function maker.class_object(x)
+    return is_class(x) or is_instance(x) or false
+  end
+
+  function maker.method(x)
+    local is_f = is_function
+    local is_t = is_table
+
+    local function recursive_check(x)
+      if is_f(x) then
+        return true
+      elseif not is_t(x) then
+        return false
+      end
+
+      local mt = mtget(x) or {}
+      if
+        mt.__call
+        and mt.method
+        and recursive_check(mt.__call)
+      then
+        return x
+      end
+
+      return false
+    end
+
+    return recursive_check(x)
+  end
+
+  function maker.list(x, list_like)
+    if not is_table(x) then
+      return false
+    end
+
+    local mt = not list_like and getmetatable(x)
+    if mt and mt.type ~= "list" then
+      return false
+    end
+
+    local len = size(x)
+    if len == 0 then
+      return false
+    end
+
+    local ok = len == #x
+    if not ok then
+      return false
+    end
+
+    return true
+  end
+
+  function maker.dict(x, dict_like)
+    if not is_table(x) then
+      return false
+    elseif not dict_like then
+      local mt = getmetatable(x)
+      if mt then
+        if mt.type == "dict" then
+          return x
+        elseif mt.type ~= nil then
+          return false
+        end
+      end
+    end
+
+    local len = size(x)
+    if len == 0 then
+      return false
+    elseif len == #x then
+      return false
+    else
+      return x
     end
   end
 
-  return self.guards[name], name
+  function maker.instance(self)
+    local mt = mtget(self)
+    if not mt then
+      return false
+    end
+
+    return mt.instance and is_class(mt.class)
+  end
+
+  function maker.literal(x)
+    return (is_string(x) or is_number(x) or is_boolean(x))
+      or false
+  end
 end
 
---- @param name string
---- @param fn method
---- @param table
-function package.guards:create(name, fn)
-  if not fn then
-    fn, name = self:get(name)
+--------------------------------------------------
+--- Return type based on lua type or <metatable>.type
+--- @param x any
+--- @return string?
+function typeof(x)
+  local x_type = type(x)
+  if x_type ~= "table" then
+    return x_type
+  elseif is_method(x) then
+    return "method"
+  elseif is_list(x) then
+    return "list"
+  elseif is_dict(x) then
+    return "dict"
+  end
+
+  local x_mt = getmetatable(x)
+  if not x_mt then
+    return "table"
+  elseif not x_mt.type then
+    return "table"
   else
-    name = name:gsub('^is_', '')
+    return x_mt.type
   end
-
-  throw.fn(is_method(fn))
-
-  self.guards[name] = fn
-  _G['is_' .. name] = fn
-
-  return self 
 end
 
-function package.guards:remove(name)
-  throw.name(is_string(name))
-
-  name = name:gsub('^is_', '')
-  self.guards[name] = nil
-  _G['is_' .. name] = nil
-
-  return self
+--- Check if x and y point to the same object
+--- @param x table
+--- @param y table
+--- @return boolean
+function sameref(x, y)
+  return ref(x) == ref(y)
 end
 
-mtset(package.guards, {
-  __index = function (self, name)
-    return self:get(name)
-  end,
-  __newindex = function (self, name, fn)
-    return self:create(name, fn)
+function tolist(x, force)
+  if force then
+    return { x }
+  elseif is_method(x) or not is_table(x) then
+    return { x }
+  else
+    return x
   end
-})
+end
