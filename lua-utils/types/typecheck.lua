@@ -105,7 +105,7 @@ end
 --- @param ... string|function|table
 --- @return fun(x): boolean, string?
 function Union_mt:__call(...)
-  local args = pack(...)
+  local args = tuple.pack(...)
 
   return setmetatable({}, {
     method = true,

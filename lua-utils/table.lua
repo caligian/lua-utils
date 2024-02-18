@@ -751,7 +751,7 @@ function list.zip_longest(fillvalue, arrs)
   for i = 1, max do
     out[i] = {}
     for j = 1, len do
-      list.append(out[i], { arrs[j][i] or fillvalue })
+      list.append(out[i], arrs[j][i] or fillvalue)
     end
   end
 
@@ -776,7 +776,7 @@ function list.zip(arrs)
   for i = 1, min do
     out[i] = {}
     for j = 1, len do
-      list.append(out[i], { arrs[j][i] })
+      list.append(out[i], arrs[j][i])
     end
   end
 
@@ -810,7 +810,7 @@ local function _flatten(x, depth, _len, _current_depth, _result)
     if is_table(elem) then
       _flatten(x[i], depth, _len, _current_depth + 1, _result)
     else
-      list.append(_result, { elem })
+      list.append(_result, elem)
     end
   end
 
@@ -890,9 +890,9 @@ function list.partition(x, fun_or_num)
 
     for i = 1, #x do
       if fun_or_num(x[i]) then
-        list.append(result[1], { x[i] })
+        list.append(result[1], x[i])
       else
-        list.append(result[2], { x[i] })
+        list.append(result[2], x[i])
       end
     end
 

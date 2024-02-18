@@ -21,7 +21,46 @@ function pack_tuple(...)
   return args
 end
 
-pack = pack_tuple
+do
+  local mt = {type = 'ns'}
+  tuple = setmetatable({}, mt)
+  tuple.unpack = table.unpack or unpack
+  tuple.pack = pack_tuple
+
+  function tuple.size(...)
+    return select("#", ...)
+  end
+  tuple.length = tuple.size
+
+  function tuple.cdr(n, ...)
+    return select(n, ...)
+  end
+
+  function tuple.nth(n, ...)
+    local found = tuple.cdr(n, ...)
+    return found
+  end
+
+  function tuple.first(...)
+    return tuple.nth(1, ...)
+  end
+
+  function tuple.last(...)
+    return select(-1, ...)
+  end
+
+  function tuple.slice(i, j, ...)
+    local args = tuple.pack(select(i, ...))
+    if #args == 0 then
+      return {}
+    else
+      for a = j+1, #args do
+        args[a] = nil
+      end
+    end
+    return args
+  end
+end
 
 --- @param x any
 --- @param force? bool forcefully wrap the elem in a table?
@@ -107,7 +146,8 @@ end
 function sprintf(fmt, ...)
   local args = { ... }
   for i = 1, #args do
-    args[i] = type(args[i]) ~= "string" and inspect(args[i]) or args[i]
+    args[i] = type(args[i]) ~= "string" and inspect(args[i])
+      or args[i]
   end
 
   return string.format(fmt, unpack(args))

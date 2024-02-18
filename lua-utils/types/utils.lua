@@ -178,45 +178,6 @@ do
   end
 end
 
---- Define a method object. This is useful for differentiating instances and types from methods
---- @overload fun(fn: method): table
---- @overload fun(mod: table, fn: method): table
-function defn(...)
-  local args = { ... }
-  local nargs = #args
-
-  local function create(f, obj)
-    local mt = { method = true }
-    obj = mtset(obj or {}, mt)
-
-    function mt:__call(...)
-      return f(...)
-    end
-
-    return obj
-  end
-
-  if nargs == 1 then
-    local f = args[1]
-    assert(is_method(f))
-
-    return create(f)
-  elseif nargs == 2 then
-    local m = args[1]
-    local f = args[2]
-
-    assert(is_table(m))
-    assert(is_method(f))
-
-    return create(f, m)
-  end
-
-  error(
-    "expected table with at least 1 value, got "
-      .. dump(args)
-  )
-end
-
 --- User defined guards
 --- @class guards
 --- @overload fun(name: string, fn: function): function
@@ -268,7 +229,7 @@ do
             local mt = mtget(x)
 
             if mt then
-              local has_tp = mt.type or 'table'
+              local has_tp = mt.type or "table"
               local ismethod = mt.method
               local isinst = mt.instance
               local msg
@@ -314,6 +275,7 @@ do
 
       function checker.assert(x)
         assert(checker.dump(x))
+        return true
       end
 
       checker.opt = {
@@ -357,7 +319,8 @@ do
       })
 
       guards.guards[name] = checker
-      guards.guards['is_' .. name] = checker
+      guards.guards["is_" .. name] = checker
+      guards.guards[checker] = checker
       _G["is_" .. name] = checker
 
       return self
@@ -461,7 +424,7 @@ do
         and mt.method
         and recursive_check(mt.__call)
       then
-        return x
+        return true
       end
 
       return false
@@ -500,7 +463,7 @@ do
       local mt = getmetatable(x)
       if mt then
         if mt.type == "dict" then
-          return x
+          return true
         elseif mt.type ~= nil then
           return false
         end
@@ -513,7 +476,7 @@ do
     elseif len == #x then
       return false
     else
-      return x
+      return true
     end
   end
 
@@ -574,4 +537,123 @@ function tolist(x, force)
   else
     return x
   end
+end
+
+--- @alias defn.fn (fun(self:table, ...:any): any)
+--- @alias defn.return {[1]: defn.fn, is_a?: function[], apply?: function}
+
+--- @class defn.form
+--- @field [1] number
+--- @field [2] defn.fn
+--- @field is_a? function[]
+--- @field apply? function
+
+--- Define a non-variadic method with function signatures bound to parameter lengths
+--- This is less powerful but much faster than multimethod() which only works on parameter signatures
+--- @param ... defn.form
+--- @return table<number, defn.return>
+function defn(...)
+  local mt = { method = true }
+  local mod = setmetatable({}, mt)
+  local sigs = { ... }
+
+  for i = 1, #sigs do
+    local sig = sigs[i]
+    --- @cast sig defn.form
+
+    if not is_table(sig) then
+      error(
+        i
+          .. ": expected {number, method}, got "
+          .. dump(sig)
+      )
+    end
+
+    local n, fn, isa = tuple.unpack(sig)
+    isa = sig.is_a
+    if
+      not (
+        is_number(n)
+        and is_method(fn)
+        and is_table.opt.assert(isa)
+      )
+    then
+      error(
+        i
+          .. ": expected {number, method, is_a = [constraint[]]}, got "
+          .. dump(sig)
+      )
+    end
+
+    if isa then
+      for j = 1, #isa do
+        if not is_method(isa[j]) then
+          error(
+            i
+              .. "."
+              .. j
+              .. "<is_a>: "
+              .. "expected method, got "
+              .. dump(isa[j])
+          )
+        end
+      end
+    end
+
+    mod[n] = {
+      fn,
+      is_a = sig.is_a,
+      apply = function(...)
+        return fn(mod, ...)
+      end,
+    }--[[@as defn.return]]
+  end
+
+  function mt:__call(...)
+    local params = tuple.pack(...)
+    local n = #params
+    local def = mod[n]
+
+    if not def then
+      error(
+        string.format(
+          "invalid method signature\n<%d>: %s",
+          n,
+          dump(params)
+        )
+      )
+    end
+
+    isa = def.is_a
+    def = def[1]
+
+    if isa then
+      for i = 1, #isa do
+        local checker = isa[i]
+        if guards.guards[checker] then
+          local ok, msg = checker.dump(params[i])
+          if not ok then
+            error(i .. ": " .. msg)
+          end
+        else
+          local ok, msg = checker(params[i])
+          if not ok then
+            if msg then
+              error(i .. ": " .. msg)
+            else
+              error(
+                i
+                  .. ": type validation failed for "
+                  .. dump(params[i])
+              )
+            end
+          end
+        end
+      end
+    end
+
+    return def(mod, ...)
+  end
+
+  return mod--[[@as table<number, defn.return>]]
 end
