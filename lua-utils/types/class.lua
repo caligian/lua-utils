@@ -74,7 +74,7 @@ function class.super(self, ...)
 end
 
 function class.include(self, other)
-  if not is_ns(other) or not is_class(other) then
+  if not is_ns(other) and not is_class(other) then
     error('expected other to be a namespace or a class, got ' .. dump(other))
   end
 
@@ -85,15 +85,15 @@ function class.include(self, other)
   return self
 end
 
---- Get attributes w/o callables
---- @param exclude_callables? boolean
+--- Get attributes w/o methods
+--- @param exclude_methods? boolean
 --- @return table<string,any>
-function class.get_class_attribs(self, exclude_callables)
+function class.get_class_attribs(self, exclude_methods)
   assert(is_class_object(self))
 
   local out = {}
   for key, value in pairs(self) do
-    if not (exclude_callables and is_method(value) or self:is_static_method(key)) then
+    if not (exclude_methods and is_method(value) or self:is_static_method(key)) then
       out[key] = value
     end
   end

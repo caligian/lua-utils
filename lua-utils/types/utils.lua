@@ -300,12 +300,12 @@ do
             return true
           elseif opts.dump then
             if opts.assert then
-              assert(checker.dump(obj))
+              return assert(checker.dump(obj))
             else
               return checker.dump(obj)
             end
           elseif opts.assert then
-            assert(checker.dump(obj))
+            return assert(checker.dump(obj))
           else
             return fn(obj)
           end
@@ -327,17 +327,7 @@ do
     end,
   }
 
-  local mt = {
-    type = "ns",
-    __newindex = function(self, name, fn)
-      local create = rawget(self, "create")
-      return create(self, name, fn)
-    end,
-    __call = function(self, ...)
-      return self:create(...)
-    end,
-    guards = guards.guards,
-  }
+  local mt = { type = "ns" }
 
   local function mkbuiltin(tp, fn)
     guards.create(tp, fn or function(x)
@@ -575,7 +565,7 @@ function defn(...)
       not (
         is_number(n)
         and is_method(fn)
-        and is_table.opt.assert(isa)
+        and is_table.opt(isa)
       )
     then
       error(

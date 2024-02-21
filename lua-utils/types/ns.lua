@@ -42,7 +42,7 @@ function ns:include(other)
   return dict.merge(mod, other)
 end
 
---- Get all callables in a dict with their names
+--- Get all methods in a dict with their names
 --- @return table<any,function>
 function ns:get_methods()
   return dict.filter(self, function(_, value)

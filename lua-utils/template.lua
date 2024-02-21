@@ -122,7 +122,7 @@ function parse.parse(match, repl)
 end
 
 local function gmatch(s, repl)
-  assert_is_a(repl, union("callable", "table"))
+  assert_is_a(repl, union("method", "table"))
 
   local nl = P "\n" ^ 0
   local escaped_open = P "\\{"

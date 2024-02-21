@@ -44,11 +44,11 @@ Argparser.Positional = class "Argparser.Positional"
 function Argparser.Positional:init(specs)
   form[{
     ["name?"] = union("string", "number"),
-    ["post?"] = "callable",
-    ["assert?"] = "callable",
+    ["post?"] = "method",
+    ["assert?"] = "method",
     ["help?"] = "string",
     ["args?"] = "table",
-    ["default?"] = "callable",
+    ["default?"] = "method",
     ["required?"] = "boolean",
     ["pos?"] = "boolean",
     ["metavar?"] = "string",
@@ -70,11 +70,11 @@ function Argparser.Option:init(specs)
     ["short?"] = "string",
     ["long?"] = "string",
     ["index?"] = "number",
-    ["post?"] = "callable",
-    ["assert?"] = "callable",
+    ["post?"] = "method",
+    ["assert?"] = "method",
     ["help?"] = "string",
     ["args?"] = "table",
-    ["default?"] = "callable",
+    ["default?"] = "method",
     ["required?"] = "boolean",
   }].options(specs)
 

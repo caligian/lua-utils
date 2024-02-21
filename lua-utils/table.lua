@@ -827,10 +827,10 @@ end
 
 --- Partition dict
 --- @param x table
---- @param fn fun(x):bool elements that succeed the callable will be placed in `result[1]` and the failures in `result[2]`
+--- @param fn fun(x):bool elements that succeed the method will be placed in `result[1]` and the failures in `result[2]`
 --- @return list result
 function dict.partition(x, fn)
-  assert_is_a(fn, "callable")
+  assert_is_a(fn, "method")
 
   local result = { {}, {} }
 
@@ -880,10 +880,10 @@ end
 --- > partition({1, 2, 3, 4, 5}, greater_than_2) -- {{3, 4, 5}, {1, 2}}
 --- > partition({1, 2, 3, 4}, 3) -- {{1, 2, 3}, {4}}
 --- @param x list
---- @param fun_or_num number|function If callable then elements that succeed the callable will be placed in `result[1]` and the failures in `result[2]`. If number than chunk list
+--- @param fun_or_num number|function If method then elements that succeed the method will be placed in `result[1]` and the failures in `result[2]`. If number than chunk list
 --- @return list result
 function list.partition(x, fun_or_num)
-  assert_is_a(fun_or_num, union("number", "callable"))
+  assert_is_a(fun_or_num, union("number", "method"))
 
   if is_method(fun_or_num) then
     local result = { {}, {} }
@@ -1057,7 +1057,7 @@ function dict.from_zipped(zipped)
   local out = {}
 
   list.each(zipped, function(x)
-    out[first(x)] = cdr(x)
+    out[x[1]] = list.rest(x)
   end)
 
   return out
@@ -1071,7 +1071,7 @@ function dict.from_list(X, default)
   local res = {}
 
   if default then
-    assert_is_a.callable(default)
+    assert_is_a.method(default)
   end
 
   for _, x in ipairs(X) do

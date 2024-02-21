@@ -22,7 +22,7 @@ end
 function Union._match_fun(value, spec)
   local ok, msg = spec(value)
   if not ok then
-    return false, msg or "callable failed for " .. dump(value)
+    return false, msg or "method failed for " .. dump(value)
   end
   return value
 end

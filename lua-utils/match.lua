@@ -54,7 +54,7 @@ function case.test(obj, spec, opts)
         if msg then
           error(msg)
         else
-          error("callable failed for " .. dump(obj))
+          error("method failed for " .. dump(obj))
         end
       else
         return false, msg
@@ -183,7 +183,7 @@ function case.test(obj, spec, opts)
             error(_prefix .. ": " .. msg)
           end
           error(
-            _prefix .. ": callable failed for " .. dump(x)
+            _prefix .. ": method failed for " .. dump(x)
           )
         else
           return false
@@ -237,7 +237,7 @@ function case.test(obj, spec, opts)
       local ok, msg = y(x)
       if ok then
         if not absolute then
-          State[key] = true
+          State[k] = true
         end
       elseif ass then
         if msg then
@@ -245,18 +245,18 @@ function case.test(obj, spec, opts)
         end
         error(
           _prefix
-            .. ": callable failed for "
+            .. ": method failed for "
             .. dump(obj_value)
         )
       elseif absolute then
         return false
       else
-        State[key] = false
+        State[k] = false
       end
     elseif eq then
       if eq(x, y) then
         if not absolute then
-          State[key] = true
+          State[k] = true
         end
       elseif ass then
         error(
@@ -281,10 +281,10 @@ function case.test(obj, spec, opts)
       elseif absolute then
         return false
       else
-        State[key] = false
+        State[k] = false
       end
     elseif not absolute then
-      State[key] = true
+      State[k] = true
     end
 
     return true
@@ -622,7 +622,7 @@ function case:__call(specs)
     local function add_rule(rule)
       assert(
         #rule == 2,
-        "expected {<spec>, <callable>}, got " .. dump(rule)
+        "expected {<spec>, <method>}, got " .. dump(rule)
       )
       form.method["rule[2]"](rule[2])
 

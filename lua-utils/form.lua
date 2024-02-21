@@ -20,7 +20,7 @@ local function equal(value, spec_value, display)
   if is_method(spec_value) then
     local ok, msg = spec_value(value)
     if not ok then
-      msg = display .. ': '  .. (msg or 'callable failed for ' .. dump(value)) 
+      msg = display .. ': '  .. (msg or 'method failed for ' .. dump(value)) 
       error(msg)
     end
     return true
