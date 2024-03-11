@@ -12,7 +12,10 @@ local ns_mt = { __tostring = dump, type = "ns" }
 mtset(ns--[[@as table]], ns_mt)
 
 function ns_mt:__call(name)
-  return copy.table(ns --[[@as table]], { metatable = true })
+  local mod = copy.table(ns)
+  local mt = copy.table(ns_mt)
+  mt.name = name
+  return mtset(mod, mt)
 end
 
 function ns_mt:__newindex(key, value)
@@ -75,14 +78,35 @@ end
 --- Check if self is a valid ns
 --- @param other table Check if other is the same ns as self
 --- @return table?, string?
-function ns:is_a(other)
-  throw.self(is_ns(self))
-  throw.other(is_ns(other))
+function ns:is_a(other, opts)
+  is_table.opt.assert(opts)
 
-  ok = self:get_ns_name() == other:get_ns_name()
+  opts = opts or {}
+  local ass = opts.assert
+  local dmp = opts.dump
 
+  local ok, msg = is_ns.dump(other)
   if not ok then
-    return nil, "expected " .. dump(other) .. ", got " .. dump(self)
+    if ass then
+      error(msg)
+    elseif dmp then
+      return nil, msg
+    end
+    return nil
+  end
+
+  local other_name = other:get_ns_name()
+  local self_name = self:get_ns_name()
+  ok = other_name == self_name
+  if not ok then
+    if ass or dmp then
+      local msg = "expected <ns> " .. dump(self_name)  .. '\nvalue <ns> ' .. other_name .. ': ' .. dump(other)
+      if ass then
+        error(msg)
+      end
+      return nil, msg
+    end
+    return nil
   end
 
   return self

@@ -211,10 +211,15 @@ do
     end,
 
     create = function(name, fn, message)
-      if not fn then
-        fn, name = checker.get(name)
-      else
-        name = name:gsub("^is_", "")
+      if type(name) == 'table' then
+        local opts = name
+        fn = opts.guard
+        message = opts.message
+        name = opts.name
+      end
+
+      if name then
+        name = name:gsub('^is_', '')
       end
 
       throw.fn(
@@ -233,6 +238,7 @@ do
               local ismethod = mt.method
               local isinst = mt.instance
               local msg
+              message = message or 'guard failed'
 
               if isinst then
                 msg = string.format(
@@ -261,7 +267,7 @@ do
 
             local msg = string.format(
               "%s\nvalue: <%s> %s",
-              message,
+              message or 'guard failed',
               type(x),
               dump(x),
               x
@@ -318,12 +324,14 @@ do
         method = true,
       })
 
-      guards.guards[name] = checker
-      guards.guards["is_" .. name] = checker
-      guards.guards[checker] = checker
-      _G["is_" .. name] = checker
+      if name then
+        guards.guards[name] = checker
+        guards.guards["is_" .. name] = checker
+        guards.guards[checker] = checker
+        _G["is_" .. name] = checker
+      end
 
-      return self
+      return checker
     end,
   }
 
@@ -527,123 +535,4 @@ function tolist(x, force)
   else
     return x
   end
-end
-
---- @alias defn.fn (fun(self:table, ...:any): any)
---- @alias defn.return {[1]: defn.fn, is_a?: function[], apply?: function}
-
---- @class defn.form
---- @field [1] number
---- @field [2] defn.fn
---- @field is_a? function[]
---- @field apply? function
-
---- Define a non-variadic method with function signatures bound to parameter lengths
---- This is less powerful but much faster than multimethod() which only works on parameter signatures
---- @param ... defn.form
---- @return table<number, defn.return>
-function defn(...)
-  local mt = { method = true }
-  local mod = setmetatable({}, mt)
-  local sigs = { ... }
-
-  for i = 1, #sigs do
-    local sig = sigs[i]
-    --- @cast sig defn.form
-
-    if not is_table(sig) then
-      error(
-        i
-          .. ": expected {number, method}, got "
-          .. dump(sig)
-      )
-    end
-
-    local n, fn, isa = tuple.unpack(sig)
-    isa = sig.is_a
-    if
-      not (
-        is_number(n)
-        and is_method(fn)
-        and is_table.opt(isa)
-      )
-    then
-      error(
-        i
-          .. ": expected {number, method, is_a = [constraint[]]}, got "
-          .. dump(sig)
-      )
-    end
-
-    if isa then
-      for j = 1, #isa do
-        if not is_method(isa[j]) then
-          error(
-            i
-              .. "."
-              .. j
-              .. "<is_a>: "
-              .. "expected method, got "
-              .. dump(isa[j])
-          )
-        end
-      end
-    end
-
-    mod[n] = {
-      fn,
-      is_a = sig.is_a,
-      apply = function(...)
-        return fn(mod, ...)
-      end,
-    }--[[@as defn.return]]
-  end
-
-  function mt:__call(...)
-    local params = tuple.pack(...)
-    local n = #params
-    local def = mod[n]
-
-    if not def then
-      error(
-        string.format(
-          "invalid method signature\n<%d>: %s",
-          n,
-          dump(params)
-        )
-      )
-    end
-
-    isa = def.is_a
-    def = def[1]
-
-    if isa then
-      for i = 1, #isa do
-        local checker = isa[i]
-        if guards.guards[checker] then
-          local ok, msg = checker.dump(params[i])
-          if not ok then
-            error(i .. ": " .. msg)
-          end
-        else
-          local ok, msg = checker(params[i])
-          if not ok then
-            if msg then
-              error(i .. ": " .. msg)
-            else
-              error(
-                i
-                  .. ": type validation failed for "
-                  .. dump(params[i])
-              )
-            end
-          end
-        end
-      end
-    end
-
-    return def(mod, ...)
-  end
-
-  return mod--[[@as table<number, defn.return>]]
 end

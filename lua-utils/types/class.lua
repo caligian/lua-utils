@@ -42,7 +42,7 @@ class.get_class = get_class
 --- Get the nearest .init() method for class. Throws an error when no init method is found
 --- @param self class
 --- @return function
-function class.get_super_method(self)
+function class:get_super_method()
   local _parent = self:get_class_parent()
 
   while _parent do
@@ -69,11 +69,11 @@ function super(obj, ...)
   return init(obj, ...)
 end
 
-function class.super(self, ...)
+function class:super(...)
   return super(self, ...)
 end
 
-function class.include(self, other)
+function class:include(other)
   if not is_ns(other) and not is_class(other) then
     error('expected other to be a namespace or a class, got ' .. dump(other))
   end
@@ -88,9 +88,7 @@ end
 --- Get attributes w/o methods
 --- @param exclude_methods? boolean
 --- @return table<string,any>
-function class.get_class_attribs(self, exclude_methods)
-  assert(is_class_object(self))
-
+function class:get_class_attribs(exclude_methods)
   local out = {}
   for key, value in pairs(self) do
     if not (exclude_methods and is_method(value) or self:is_static_method(key)) then
@@ -101,14 +99,13 @@ function class.get_class_attribs(self, exclude_methods)
   return out
 end
 
-function class.get_class_attrib(self, name)
-  assert(is_class(self) or is_instance(self), dump(self))
+function class:get_class_attrib(name)
   local found = rawget(self, name)
 
   if not found then
-    local p = class.get_class_parent(self)
+    local p = self:get_class_parent()
     if p then
-      return class.get_class_attrib(p, name)
+      return  p:get_class_attrib(name)
     end
   end
 
@@ -118,8 +115,7 @@ end
 --- Get static methods for class
 --- @param self class
 --- @return table?
-function class.get_static_methods(self)
-  local cls = assert_get_class(self)
+function class:get_static_methods()
   local methods = mtget(cls, "static")
   if not methods then
     return
@@ -138,10 +134,7 @@ end
 --- Get instance methods
 --- @param self class
 --- @return table<any,function>
-function class.get_instance_methods(self)
-  assert(is_class_object(self))
-
-  local cls = assert_get_class(self)
+function class:get_instance_methods()
   local static_methods = mtget(cls, 'static')
   local out = {}
 
@@ -156,48 +149,82 @@ end
 --- Is `name` a static method
 --- @param name string method name
 --- @return boolean
-function class.is_static_method(self, name)
-  return (mtget(assert_get_class(self), "static") or {})[name] and true or false
+function class:is_static_method(name)
+  return mtget(self, 'static')[name] and true or false
 end
 
 --- Is `name` an instance method
 --- @param self class
 --- @param name string
 --- @return boolean
-function class.is_instance_method(self, name)
+function class:is_instance_method(name)
   return not self:is_static_method(name) and self[name] and true or false
 end
 
 --- Get class name
 --- @param self class
 --- @return string?
-function class.get_class_name(self)
-  return mtget(assert_get_class(self), "name")
+function class:get_class_name()
+  return mtget(self, "name")
 end
 
 --- Get class parent
 --- @param self class
 --- @return table?
-function class.get_class_parent(self)
-  return mtget(assert_get_class(self), "parent")
+function class:get_class_parent()
+  return mtget(self, "parent")
 end
 
 --- Is other a child of self
 --- @param self class
 --- @param other class
 --- @return class?
-function class.is_child_of(self, other)
-  other = assert_get_class(other)
-  self = assert_get_class(self)
+function class:is_child_of(other, opts)
+  is_table.opt.assert(opts)
+  opts = opts or {}
+  local ass = opts.assert
+  local dmp = opts.dump
+  local ok, msg = is_class_object.dump(other)
+
+  if not ok then
+    if ass then
+      error('other: ' .. msg)
+    elseif dmp then
+      return nil, msg
+    else
+      return
+    end
+  else
+    other = get_class(other)
+  end
+
+  local function msg()
+    return
+      'expected subclass of ' 
+      .. other:get_class_name()
+      .. '\nvalue <class> ' 
+      .. dump(self:get_class_name())
+      .. ' '
+      .. dump(self)
+  end
 
   local self_parent = self:get_class_parent()
   if not self_parent then
+    if ass then
+      error(msg())
+    elseif dmp then
+      return nil, msg()
+    end
     return
   end
 
   while self_parent ~= other do
     self_parent = self_parent:get_class_parent()
-    if not self_parent then
+    if ass then
+      error(msg())
+    elseif dmp then
+      return nil, msg()
+    else
       return
     end
   end
@@ -209,37 +236,45 @@ end
 --- @param self class
 --- @param other class
 --- @return class?
-function class.is_parent_of(self, other)
-  ---@diagnostic disable-next-line: param-type-mismatch
-  return class.is_child_of(other, self)
+function class:is_parent_of(other, opts)
+  return self:is_child_of(other, self, opts)
 end
 
 --- Check if other is a parent of self or self itself
 --- @param self class
 --- @param other class
 --- @return class?, string?
-function class.is_a(self, other)
+function class:is_a(other, opts)
+  is_table.opt.assert(opts)
+  opts = opts or {}
+
+  local ass = opts.assert
+  local dmp = opts.dump
+
+  local ok, msg = is_class_object.dump(other)
+  if not ok then
+    if ass then
+      error(msg)
+    elseif dmp then
+      return nil, msg
+    end
+    return nil
+  end
+
   if other == self then
     return other
   end
 
-  other = get_class(other) --[[@as class]]
-  if not other then
-    return nil, "expected other as class|instance, got " .. dump(other)
+  local p = self:get_class_parent()
+  local q = other:get_class_parent()
+  if p and q and p == q then
+    return true
   end
 
-  self = get_class(self)
-  if not self then
-    return nil, "expected class|instance, got " .. dump(self)
-  end
-
-  if self:get_class_parent() == other:get_class_parent() then
-    return other
-  end
-
-  return self:is_child_of(other) and other
+  return self:is_child_of(other, opts)
 end
 
+--------------------------------------------------
 function class:__call(name, opts)
   throw.name(is_string(name))
 
@@ -282,14 +317,13 @@ function class:__call(name, opts)
     instance = true,
     type = name,
     class = classmod,
+    parent = parent,
+    static = static,
     __tostring = dump,
   }
 
   function objmt:__index(key)
-    if key == "super" then
-      error("attempting to use .super() on instance: " .. dump(self))
-    end
-    return class.get_class_attrib(self, key)
+    return self:get_class_attrib(key)
   end
 
   function objmt:__newindex(key, value)
@@ -313,8 +347,9 @@ function class:__call(name, opts)
 
   function classmodmt:__call(...)
     local obj = mtset({}, objmt)
+
     --- @cast obj class
-    local static_methods = self:get_static_methods()
+    local static_methods = static
 
     --- @cast obj class
     for key, value in pairs(classmod) do
@@ -328,7 +363,7 @@ function class:__call(name, opts)
     if init then
       return init(obj, ...)
     else
-      return self:super(obj, ...)
+      return obj:super(...)
     end
   end
 
