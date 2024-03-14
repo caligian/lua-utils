@@ -13,6 +13,130 @@ function dump(x)
   return inspect(x)
 end
 
+function dumpx(x, ws_n, mem, mem_id, v_mem, v_mem_id)
+  mem = mem or setmetatable({}, {__mode = 'kv'})
+  v_mem = v_mem or setmetatable({}, {__mode = 'kv'})
+  mem_id = mem_id or 0
+  v_mem_id = v_mem_id or 0
+
+  if mem[x] then
+    return mem[x]
+  end
+
+  mem[x] = "<" .. tostring(mem_id) .. ">"
+  ws_n = ws_n or 0
+  local ws = string.rep(' ', ws_n)
+  local item_ws = string.rep(' ', ws_n+2)
+  local later = {}
+  local laterx = {}
+  local ks = {}
+  local vs = {}
+  local key_name = function (k)
+    return type(k) ~= 'string' and tostring(k) or k
+  end
+  local value_name = function (v)
+    local id = "<" .. tostring(mem_id) .. ">"
+    return id
+  end
+  local function ref(v)
+    if v_mem[v] then
+      return v_mem[v]
+    end
+
+    local t = type(v)
+    if t ~= 'string' and t~= 'boolean' and t ~= 'number' then
+      local name
+      local r = tostring(v)
+      name, _ = string.match(r, '^([^:]+): ')
+      v_mem[v] = name ..":" .. v_mem_id .. ""
+      v_mem_id = v_mem_id + 1
+
+      return v_mem[v]
+    end
+
+    return tostring(v)
+  end
+  local s = {value_name(x), "{"}
+  local i = 3
+  local push = function (...)
+    for _, y in ipairs {...} do
+      s[i] = y
+      i = i + 1
+    end
+  end
+
+  for a, v in pairs(x) do
+    if type(a) == 'string' and a:match('^__') then
+      laterx[#laterx+1] = a
+    elseif type(v) == 'table' then
+      if not mem[v] then
+        later[#later+1] = a
+      else
+        ks[#ks+1] = a
+        vs[#vs+1] = mem[v]
+      end
+    elseif mem[v] then
+      vs[#vs+1] = mem[v]
+      ks[#ks+1] = a
+    else
+      vs[#vs+1] = v_mem[v] or v
+      ks[#ks+1] = a
+    end
+  end
+
+  for i = 1, #ks do
+    ks[i] = key_name(ks[i])
+    vs[i] = vs[i]
+  end
+
+  for i=1, #laterx do
+    local k = laterx[i]
+    local v = x[k]
+    ks[#ks+1] = key_name(k)
+    vs[#vs+1] = v
+  end
+
+  for i=1, #later do
+    local k = later[i]
+    local v = x[k]
+    ks[#ks+1] = key_name(k)
+    vs[#vs+1] = v
+  end
+
+  if #ks == 0 then
+    return "{}"
+  else
+    push("\n")
+  end
+
+  local sprintf = string.format
+
+  for i = 1, #ks do
+    local key = ks[i]
+    local value = vs[i]
+    local fmt = "%s%s: %s\n"
+
+    if mem[value] then
+      push(sprintf(fmt, item_ws, key, mem[value]))
+    elseif type(value) == 'table' then
+      local msg = dumpx(value, ws_n+2, mem, mem_id+1, v_mem, v_mem_id)
+      push(sprintf(fmt, item_ws, key, msg))
+      mem[value] = tostring(value) 
+      mem_id = mem_id + 1
+    else
+      push(sprintf(fmt, item_ws, key, ref(value)))
+    end
+  end
+
+  push(ws, "}")
+
+  return table.concat(s, "")
+end
+
+function ppx(x)
+  print(dumpx(x))
+end
+
 --- Valid lua metatable keys
 --- @enum
 local mtkeys = {
@@ -39,16 +163,14 @@ local mtkeys = {
 }
 
 --- All valid metatable events
-package.metatable_events = mtkeys
+table.metaevents = mtkeys
 
 --- Is event a valid metatable event?
 --- @param event string
 --- @return boolean
-function package.is_valid_event(event)
-  return package.metatable_events[event] and true or false
+function table.is_valid_event(event)
+  return table.metaevents[event] and true or false
 end
-
-is_valid_event = package.is_valid_event
 
 --- Get metatable or metatable key
 --- @param obj table
@@ -159,6 +281,7 @@ do
   local mt = {}
   --- Throw error if test fails like assert but with a name
   --- > throw.variable_name(is_table(1)) -- variable_name: expected table, got "1"
+  --- @class throw
   --- @overload fun(name: string, test: boolean, msg?: string)
   throw = setmetatable({}, mt)
 
@@ -211,7 +334,7 @@ do
     end,
 
     create = function(name, fn, message)
-      if type(name) == 'table' then
+      if type(name) == "table" then
         local opts = name
         fn = opts.guard
         message = opts.message
@@ -219,7 +342,7 @@ do
       end
 
       if name then
-        name = name:gsub('^is_', '')
+        name = name:gsub("^is_", "")
       end
 
       throw.fn(
@@ -238,7 +361,7 @@ do
               local ismethod = mt.method
               local isinst = mt.instance
               local msg
-              message = message or 'guard failed'
+              message = message or "guard failed"
 
               if isinst then
                 msg = string.format(
@@ -267,7 +390,7 @@ do
 
             local msg = string.format(
               "%s\nvalue: <%s> %s",
-              message or 'guard failed',
+              message or "guard failed",
               type(x),
               dump(x),
               x
@@ -335,7 +458,7 @@ do
     end,
   }
 
-  local mt = { type = "ns" }
+  local mt = {}
 
   local function mkbuiltin(tp, fn)
     guards.create(tp, fn or function(x)
@@ -402,7 +525,10 @@ do
   end
 
   function maker.class_object(x)
-    return is_class(x) or is_instance(x) or false
+    if is_class(x) or is_instance(x) then
+      return true
+    end
+    return false
   end
 
   function maker.method(x)
@@ -419,7 +545,7 @@ do
       local mt = mtget(x) or {}
       if
         mt.__call
-        and mt.method
+        and x.type == "method"
         and recursive_check(mt.__call)
       then
         return true
@@ -431,13 +557,8 @@ do
     return recursive_check(x)
   end
 
-  function maker.list(x, list_like)
+  function maker.list(x)
     if not is_table(x) then
-      return false
-    end
-
-    local mt = not list_like and getmetatable(x)
-    if mt and mt.type ~= "list" then
       return false
     end
 
@@ -454,18 +575,9 @@ do
     return true
   end
 
-  function maker.dict(x, dict_like)
+  function maker.dict(x)
     if not is_table(x) then
       return false
-    elseif not dict_like then
-      local mt = getmetatable(x)
-      if mt then
-        if mt.type == "dict" then
-          return true
-        elseif mt.type ~= nil then
-          return false
-        end
-      end
     end
 
     local len = size(x)
@@ -479,12 +591,7 @@ do
   end
 
   function maker.instance(self)
-    local mt = mtget(self)
-    if not mt then
-      return false
-    end
-
-    return mt.instance and is_class(mt.class)
+    return is_table(self) and is_class(self.class)
   end
 
   function maker.literal(x)
@@ -499,24 +606,15 @@ end
 --- @return string?
 function typeof(x)
   local x_type = type(x)
-  if x_type ~= "table" then
-    return x_type
-  elseif is_method(x) then
-    return "method"
-  elseif is_list(x) then
-    return "list"
-  elseif is_dict(x) then
-    return "dict"
+
+  if type(x) == "table" then
+    if x.type then
+      return x.type
+    end
+    return "table"
   end
 
-  local x_mt = getmetatable(x)
-  if not x_mt then
-    return "table"
-  elseif not x_mt.type then
-    return "table"
-  else
-    return x_mt.type
-  end
+  return x_type
 end
 
 --- Check if x and y point to the same object
@@ -536,3 +634,91 @@ function tolist(x, force)
     return x
   end
 end
+
+base = {
+  type = 'class',
+  name = 'base',
+  init = function (self, ...)
+    return self, ...
+  end,
+}
+base.__index = base
+base.__tostring = dumpx
+
+function base.new(cls, ...)
+  local obj = {type = 'instance', name = cls.name, class = cls}
+  cls.__index = cls
+  setmetatable(obj, cls)
+
+  if cls.init then
+    return cls.init(obj, ...)
+  end
+
+  return obj, ...
+end
+base.__call = base.new
+
+function base.is_parent_of(cls, inst)
+  if not is_class_object(cls) or not is_class_object(inst) then
+    return false
+  end
+
+  if is_instance(cls) then
+    cls = cls.class
+  end
+
+  if is_instance(inst) then
+    inst = inst.class
+  end
+
+  if cls == inst.class then
+    return true
+  end
+
+  return base.is_parent_of(cls, inst.class)
+end
+
+function base.is_child_of(cls, inst)
+  return base.is_parent_of(inst, cls)
+end
+
+function base.is_a(cls, inst, opts)
+  opts = opts or {}
+  local d = opts.dump
+  local a = opts.assert
+  local ok = cls == inst or cls == mtget(inst) or cls:is_parent_of(inst)
+
+  if not ok then
+    if d or a then
+      local msg = string.format('expected %s, got %s', cls.name, dump(inst))  
+      if d then
+        return false, msg
+      end
+      assert(msg)
+    else
+      return false
+    end
+  else
+    return true
+  end
+end
+
+function class(cls)
+  cls = cls or {}
+  is_table.assert(cls)
+  local init = cls.init
+  cls.__index = cls
+  cls.__tostring = dumpx
+  cls.class = cls.class or base
+  setmetatable(cls, cls.class)
+
+  return cls
+end
+
+local A = class {name = 'A'}
+local B = class {name = 'B', class = A, init = function (obj, ...)
+  obj.args = {...}
+  return obj
+end}
+local C = class {name = 'C', class = B}
+print(C.init(C, 1, 23):is_child_of(B))
