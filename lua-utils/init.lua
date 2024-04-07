@@ -1,11 +1,4 @@
-require "lua-utils.copy"
-require "lua-utils.function"
-require "lua-utils.utils"
-require "lua-utils.table"
-require "lua-utils.lookup"
-require "lua-utils.Set"
-require "lua-utils.string"
-require "lua-utils.template"
-require "lua-utils.match"
-require "lua-utils.types"
-require "lua-utils.form"
+require 'lua-utils.guards'
+require 'lua-utils.dict'
+require 'lua-utils.class'
+require 'lua-utils.ns'

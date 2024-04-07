@@ -1,5 +1,4 @@
-require "lua-utils.utils"
-require "lua-utils.string"
+require 'lua-utils.guards'
 
 local lpeg = require "lpeg"
 local P = lpeg.P
@@ -49,8 +48,6 @@ function parse.sed(match, repl)
   local var, regex, with = unpack(matches)
   if not repl[var] then
     error("undefined placeholder: " .. var)
-  else
-    assert_is_a(repl[var], union("string", "number"))
   end
 
   return (tostring(repl[var]):gsub(regex, with))
@@ -82,8 +79,6 @@ function parse.match(match, repl)
 
   if not repl[var] then
     error("undefined placeholder: " .. var)
-  else
-    assert_is_a(repl[var], union("string", "number"))
   end
 
   local regex = string.sub(match, till + 1, #match)
@@ -122,8 +117,6 @@ function parse.parse(match, repl)
 end
 
 local function gmatch(s, repl)
-  assert_is_a(repl, union("method", "table"))
-
   local nl = P "\n" ^ 0
   local escaped_open = P "\\{"
   local escaped_close = P "\\}"

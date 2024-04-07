@@ -1,4 +1,5 @@
-require "lua-utils.table"
+loadfile "table.lua"()
+loadfile 'types.lua'()
 
 --- dictionary based set
 --- Other support operators:
@@ -15,7 +16,16 @@ require "lua-utils.table"
 --- @operator mod(function):Set map
 --- @operator mul(function):Set reduce
 --- @operator div(function): Set filter
-Set = ns "Set"
+
+Set = {}
+local mt = {}
+
+function interfaces.Set(x)
+	if type(x) ~= 'table' then
+		return false
+	end
+	return mtget(x) == mt
+end
 
 --- get set size
 --- @param self Set
@@ -27,14 +37,14 @@ end
 --- get set difference
 --- @param self Set
 function Set.difference(self, y)
-  if typeof(y) ~= "Set" then
-    self = copy(self)
+  if not is_set(y) then
+    self = copy(self, {metatable = true})
     self[y] = nil
 
     return self
   end
 
-  self = copy(self)
+  self = copy(self, {metatable = true})
   for value, _ in pairs(y) do
     self[value] = nil
   end
@@ -43,8 +53,7 @@ function Set.difference(self, y)
 end
 
 function Set.intersection(self, y)
-  assert_is_a.Set(y)
-
+	y = Set:new(y)
   self = copy(self)
 
   for value, _ in pairs(self) do
@@ -70,9 +79,9 @@ function Set.add(self, y)
     return self
   end
 
-  assert_is_a.Set(y)
-
+	y = Set:new(y)
   self = copy(self)
+
   for value, _ in pairs(y) do
     self[value] = true
   end
@@ -82,15 +91,15 @@ end
 
 function Set.union(self, y)
   if not is_table(y) then
-    self = copy(self)
+    self = copy(self, {metatable = true})
     self[y] = true
 
     return self
   end
 
-  assert_is_a.Set(y)
+	y = Set:new(y)
+  self = copy(self, {metatable = true})
 
-  self = copy(self)
   for value, _ in pairs(y) do
     self[value] = true
   end
@@ -99,7 +108,7 @@ function Set.union(self, y)
 end
 
 function Set.eq(self, other)
-  assert_is_a.Set(other)
+	other = Set:new(other)
 
   for value, _ in pairs(other) do
     if not self[value] then
@@ -111,7 +120,7 @@ function Set.eq(self, other)
 end
 
 function Set.ne(other)
-  assert_is_a.Set(other)
+	other = Set:new(other)
 
   for value, _ in pairs(other) do
     if self[value] then
@@ -136,7 +145,6 @@ Set.reduce = function(self, f)
 end
 
 function Set.superset(x, y)
-  assert_is_a.Set(y)
   return Set.size(x - y) == 0 and Set.size(x) >= Set.size(y) and x
 end
 
@@ -145,7 +153,6 @@ function Set.subset(x, y)
 end
 
 function Set.strict_superset(x, y)
-  assert_is_a.Set(y)
   return Set.size(x - y) == 0 and Set.size(x) > Set.size(y) and x
 end
 
@@ -158,36 +165,26 @@ function Set.items(self)
 end
 
 --------------------------------------------------
-local mt = {
-  type = "Set",
-  __eq = Set.eq,
-  __ne = Set.ne,
-  __concat = Set.add,
-  __add = Set.union,
-  __sub = Set.difference,
-  __pow = Set.intersection,
-  __div = Set.filter,
-  __mod = Set.map,
-  __mul = Set.reduce,
-  __le = Set.subset,
-  __lt = Set.strict_subset,
-  __gt = Set.strict_superset,
-  __ge = Set.superset,
-}
+mt.__eq = Set.eq
+mt.__ne = Set.ne
+mt.__concat = Set.add
+mt.__add = Set.union
+mt.__sub = Set.difference
+mt.__pow = Set.intersection
+mt.__div = Set.filter
+mt.__mod = Set.map
+mt.__mul = Set.reduce
+mt.__le = Set.subset
+mt.__lt = Set.strict_subset
+mt.__gt = Set.strict_superset
+mt.__ge = Set.superset
 
-function Set:__call(tbl)
-  if typeof(tbl) == "Set" then
-    return tbl
-  end
-
-  --- @type Set
-  local obj = dict.from_list(tbl, function()
-    return true
-  end)
-
-  mtset(obj, mt)
-
-  return obj
+function Set:new(tbl)
+	if is_a(tbl, interfaces.Set) then
+		return tbl
+	else
+		return mtset(dict.from_list(tbl, function() return true end), mt)
+	end
 end
 
 --------------------------------------------------
@@ -233,3 +230,7 @@ function list.subset(x, y)
     return Set.items(res)
   end
 end
+
+local a = Set:new {1, 2, 3}
+local b = Set:new {2, 3, 4}
+pp(a)
