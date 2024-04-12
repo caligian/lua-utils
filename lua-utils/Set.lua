@@ -20,13 +20,6 @@ loadfile 'types.lua'()
 Set = {}
 local mt = {}
 
-function interfaces.Set(x)
-	if type(x) ~= 'table' then
-		return false
-	end
-	return mtget(x) == mt
-end
-
 --- get set size
 --- @param self Set
 --- @return integer?
@@ -37,7 +30,7 @@ end
 --- get set difference
 --- @param self Set
 function Set.difference(self, y)
-  if not is_set(y) then
+  if not is_a(y, types.Set) then
     self = copy(self, {metatable = true})
     self[y] = nil
 
@@ -157,7 +150,7 @@ function Set.strict_superset(x, y)
 end
 
 function Set.strict_subset(x, y)
-  return _Set.strict_superset(y, x)
+  return Set.strict_superset(y, x)
 end
 
 function Set.items(self)
@@ -180,18 +173,22 @@ mt.__gt = Set.strict_superset
 mt.__ge = Set.superset
 
 function Set:new(tbl)
-	if is_a(tbl, interfaces.Set) then
+	if is_a(tbl, types.Set) then
 		return tbl
 	else
 		return mtset(dict.from_list(tbl, function() return true end), mt)
 	end
 end
 
+function types.Set(x)
+	return mtget(x) == mt
+end
+
 --------------------------------------------------
 
 function list.union(x, y)
-  x = Set(x)
-  y = Set(y)
+  x = Set:new(x)
+  y = Set:new(y)
   return Set.items(x + y)
 end
 
@@ -204,33 +201,29 @@ function list.intersection(x, y)
 end
 
 function list.strict_superset(x, y)
-  local res = Set(x) < Set(y)
+  local res = Set:new(x) < Set:new(y)
   if res then
     return Set.items(res)
   end
 end
 
 function list.superset(x, y)
-  local res = Set(x) <= Set(y)
+  local res = Set:new(x) <= Set:new(y)
   if res then
     return Set.items(res)
   end
 end
 
 function list.strict_subset(x, y)
-  local res = Set(x) < Set(y)
+  local res = Set:new(x) < Set:new(y)
   if res then
     return Set.items(res)
   end
 end
 
 function list.subset(x, y)
-  local res = Set(x) <= Set(y)
+  local res = Set:new(x) <= Set:new(y)
   if res then
     return Set.items(res)
   end
 end
-
-local a = Set:new {1, 2, 3}
-local b = Set:new {2, 3, 4}
-pp(a)
