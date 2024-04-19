@@ -1,5 +1,5 @@
-loadfile "table.lua"()
-loadfile 'types.lua'()
+require 'lua-utils.types'
+require 'lua-utils.table'
 
 --- dictionary based set
 --- Other support operators:

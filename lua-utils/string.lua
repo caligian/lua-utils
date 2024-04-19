@@ -1,7 +1,4 @@
 --- String utilities
-require "lua-utils.utils"
-require "lua-utils.table"
-
 substr = string.sub
 
 --- @class strfind.opts

@@ -56,9 +56,11 @@ end
 function copy.table(x, opts)
   if type(x) ~= "table" then
     return
-  end
+	elseif type(opts) ~= 'table' then
+		opts = {metatable = opts}
+	end
 
-  opts = opts or {}
+	opts = opts or {}
   local out = {}
   local f = opts.map
   local cp_mt = opts.metatable
@@ -77,6 +79,7 @@ function copy.table(x, opts)
   return out
 end
 
+
 --- Copy table as list
 --- @param x table
 --- @param opts? {metatable?: boolean, map?: function} opts for copying
@@ -84,6 +87,8 @@ end
 function copy.list(x, cp_mt)
   if type(x) ~= "table" then
     return
+	elseif type(opts) ~= 'table' then
+		opts = {metatable = opts}
   end
 
   opts = opts or {}

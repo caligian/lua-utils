@@ -262,7 +262,9 @@ function defined(x, orelse)
   end
 end
 
-loadfile 'tuple.lua'()
-loadfile 'copy.lua' ()
-loadfile 'function.lua'()
-loadfile 'string.lua'()
+totable = tolist
+
+require 'lua-utils.tuple'
+require 'lua-utils.copy'
+require 'lua-utils.function'
+require 'lua-utils.string'

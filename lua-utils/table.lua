@@ -1,1 +1,1 @@
-loadfile 'dict.lua'()
+require 'lua-utils.dict'

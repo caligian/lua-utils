@@ -1,4 +1,6 @@
-loadfile('core.lua')()
+require 'lua-utils.core'
+
+list = {}
 
 --- Checks if x implements y's methods
 list.at = at
@@ -265,7 +267,7 @@ function list.rest(t, n)
 end
 
 function list.contains(x, query_value, cmp)
-	for key = 1, len do
+	for key = 1, #x do
 		local value = x[key]
 
 		if cmp then
@@ -776,7 +778,7 @@ function list.ne(a, b, opts)
 	end
 end
 
-function list.merge(x, ...)
+function list.mem_merge(x, ...)
 	local args = { ... }
 	local cache = setmetatable({}, {__mode = 'kv'})
 
@@ -803,6 +805,47 @@ function list.merge(x, ...)
 							cache[x_value] = true
 						end
 					else
+						X[key] = value
+					end
+				else
+					X[key] = value
+				end
+			end
+
+			local len = #queue
+			if len ~= 0 then
+				X, Y = unpack(queue[len])
+				queue[len] = nil
+			else
+				break
+			end
+		end
+	end
+
+	return x
+end
+
+function list.merge(x, ...)
+	local args = { ... }
+
+	for i = 1, #args do
+		local X = x
+		local Y = args[i]
+		local queue = setmetatable({}, {__mode = 'kv'})
+
+		if not is_table(Y) then
+			error(i .. ": expected table, got " .. type(Y))
+		end
+
+		while X and Y do
+			for key=1, #Y do
+				local value = Y[key]
+				local x_value = X[key]
+
+				if is_table(value) then
+					if is_table(x_value) then
+						queue[#queue + 1] = { x_value, value }
+											else
 						X[key] = value
 					end
 				else

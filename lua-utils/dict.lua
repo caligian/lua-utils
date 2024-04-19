@@ -1,4 +1,4 @@
-loadfile 'list.lua'()
+require 'lua-utils.list'
 
 local function is_size(x, n)
   return size(x) == n
@@ -168,7 +168,7 @@ function dict.items(t)
   return out
 end
 
-function dict.lmerge(x, ...)
+function dict.mem_lmerge(x, ...)
   local args = { ... }
   local cache = setmetatable({}, {__mode = 'kv'})
 
@@ -214,6 +214,87 @@ function dict.lmerge(x, ...)
   return x
 end
 
+function dict.mem_merge(x, ...)
+  local args = { ... }
+  local cache = setmetatable({}, {__mode = 'kv'})
+
+  for i = 1, #args do
+    local X = x
+    local Y = args[i]
+    local queue = setmetatable({}, {__mode = 'kv'})
+
+    if not is_table(Y) then
+      error(i .. ": expected table, got " .. type(Y))
+    end
+
+    while X and Y do
+      for key, value in pairs(Y) do
+        local x_value = X[key]
+
+        if is_table(value) then
+          if is_table(x_value) then
+						queue[#queue + 1] = { x_value, value }
+					else
+            X[key] = value
+          end
+        else
+          X[key] = value
+        end
+      end
+
+      local len = #queue
+      if len ~= 0 then
+        X, Y = unpack(queue[len])
+        queue[len] = nil
+      else
+        break
+      end
+    end
+  end
+
+  return x
+end
+
+function dict.lmerge(x, ...)
+  local args = { ... }
+
+  for i = 1, #args do
+    local X = x
+    local Y = args[i]
+    local queue = setmetatable({}, {__mode == 'kv'})
+
+    if not is_table(Y) then
+      error(i .. ": expected table, got " .. type(Y))
+    end
+
+    while X and Y do
+      for key, value in pairs(Y) do
+        local x_value = X[key]
+
+        if is_table(value) then
+          if is_table(x_value) then
+						queue[#queue + 1] = { x_value, value }
+					elseif is_nil(x_value) then
+            X[key] = value
+          end
+        elseif is_nil(x_value) then
+          X[key] = value
+        end
+      end
+
+      local len = #queue
+      if len ~= 0 then
+        X, Y = unpack(queue[len])
+        queue[len] = nil
+      else
+        break
+      end
+    end
+  end
+
+  return x
+end
+
 function dict.merge(x, ...)
   local args = { ... }
   local cache = setmetatable({}, {__mode = 'kv'})
@@ -233,13 +314,8 @@ function dict.merge(x, ...)
 
         if is_table(value) then
           if is_table(x_value) then
-            if not cache[value] and not cache[x_value] then
-              queue[#queue + 1] = { x_value, value }
-            else
-              cache[value] = true
-              cache[x_value] = true
-            end
-          else
+						queue[#queue + 1] = { x_value, value }
+					else
             X[key] = value
           end
         else
@@ -333,7 +409,7 @@ end
 
 dict.get = at
 
-function dict.set(x, ks, value, fn)
+function dict.fset(x, ks, value)
 	ks.length = #ks
 	local tmp = x
 
@@ -346,15 +422,12 @@ function dict.set(x, ks, value, fn)
 		end
 	end
 
-	if fn then
-		value = fn(value)
-	end
-
 	tmp[ks[ks.length]] = value
+
 	return x
 end
 
-function dict.get_and_set(x, ks, value)
+function dict.set(x, ks, value)
 	ks.length = #ks
 	local tmp = x
 
@@ -370,7 +443,8 @@ function dict.get_and_set(x, ks, value)
 	return x
 end
 
-function dict.get_and_update(x, ks, default, fn)
+function dict.update(x, ks, default, fn)
+	ks = totable(ks)
 	ks.length = #ks
 	local tmp = x
 
@@ -387,9 +461,9 @@ function dict.get_and_update(x, ks, default, fn)
 
 	if has ~= nil then
 		if fn then
-			has = fn(has)
+			value = fn(has)
 		else
-			has = value
+			value = has
 		end
 	elseif default ~= nil then
 		value = default
@@ -400,37 +474,3 @@ function dict.get_and_update(x, ks, default, fn)
 	tmp[ks[ks.length]] = value
 	return x
 end
-
-function dict.update(x, ks, default, fn)
-	ks.length = #ks
-	local tmp = x
-
-	for i=1, ks.length-1 do
-		if type(tmp[ks[i]]) == 'table' then
-			tmp = tmp[ks[i]]
-		else
-			tmp[ks[i]] = {}
-			tmp = tmp[ks[i]]
-		end
-	end
-
-	local value
-	local has = tmp[ks[ks.length]]
-
-	if has ~= nil then
-		has = fn(has)
-	elseif default ~= nil then
-		value = default
-	else
-		value = true
-	end
-
-	tmp[ks[ks.length]] = value
-
-	return x
-end
-
-list.update = dict.update
-list.set = dict.set
-list.get_and_update = dict.get_and_update
-list.get_and_set = dict.get_and_set
