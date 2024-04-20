@@ -1,5 +1,5 @@
-require 'lua-utils.types'
-require 'lua-utils.table'
+require "lua-utils.types"
+require "lua-utils.table"
 
 --- dictionary based set
 --- Other support operators:
@@ -31,13 +31,13 @@ end
 --- @param self Set
 function Set.difference(self, y)
   if not is_a(y, types.Set) then
-    self = copy(self, {metatable = true})
+    self = copy(self, { metatable = true })
     self[y] = nil
 
     return self
   end
 
-  self = copy(self, {metatable = true})
+  self = copy(self, { metatable = true })
   for value, _ in pairs(y) do
     self[value] = nil
   end
@@ -46,7 +46,7 @@ function Set.difference(self, y)
 end
 
 function Set.intersection(self, y)
-	y = Set:new(y)
+  y = Set:new(y)
   self = copy(self)
 
   for value, _ in pairs(self) do
@@ -72,7 +72,7 @@ function Set.add(self, y)
     return self
   end
 
-	y = Set:new(y)
+  y = Set:new(y)
   self = copy(self)
 
   for value, _ in pairs(y) do
@@ -84,14 +84,14 @@ end
 
 function Set.union(self, y)
   if not is_table(y) then
-    self = copy(self, {metatable = true})
+    self = copy(self, { metatable = true })
     self[y] = true
 
     return self
   end
 
-	y = Set:new(y)
-  self = copy(self, {metatable = true})
+  y = Set:new(y)
+  self = copy(self, { metatable = true })
 
   for value, _ in pairs(y) do
     self[value] = true
@@ -101,7 +101,7 @@ function Set.union(self, y)
 end
 
 function Set.eq(self, other)
-	other = Set:new(other)
+  other = Set:new(other)
 
   for value, _ in pairs(other) do
     if not self[value] then
@@ -113,7 +113,7 @@ function Set.eq(self, other)
 end
 
 function Set.ne(other)
-	other = Set:new(other)
+  other = Set:new(other)
 
   for value, _ in pairs(other) do
     if self[value] then
@@ -138,7 +138,9 @@ Set.reduce = function(self, f)
 end
 
 function Set.superset(x, y)
-  return Set.size(x - y) == 0 and Set.size(x) >= Set.size(y) and x
+  return Set.size(x - y) == 0
+    and Set.size(x) >= Set.size(y)
+    and x
 end
 
 function Set.subset(x, y)
@@ -146,7 +148,9 @@ function Set.subset(x, y)
 end
 
 function Set.strict_superset(x, y)
-  return Set.size(x - y) == 0 and Set.size(x) > Set.size(y) and x
+  return Set.size(x - y) == 0
+    and Set.size(x) > Set.size(y)
+    and x
 end
 
 function Set.strict_subset(x, y)
@@ -173,15 +177,20 @@ mt.__gt = Set.strict_superset
 mt.__ge = Set.superset
 
 function Set:new(tbl)
-	if is_a(tbl, types.Set) then
-		return tbl
-	else
-		return mtset(dict.from_list(tbl, function() return true end), mt)
-	end
+  if is_a(tbl, types.Set) then
+    return tbl
+  else
+    return mtset(
+      dict.from_list(tbl, function()
+        return true
+      end),
+      mt
+    )
+  end
 end
 
 function types.Set(x)
-	return mtget(x) == mt
+  return mtget(x) == mt
 end
 
 --------------------------------------------------

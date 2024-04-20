@@ -1,4 +1,4 @@
-require 'lua-utils.types'
+require "lua-utils.types"
 
 local lpeg = require "lpeg"
 local P = lpeg.P
@@ -39,10 +39,14 @@ function parse.keys(match, repl)
 end
 
 function parse.sed(match, repl)
-  local matches = strsplit(match, "/", { ignore_escaped = true })
+  local matches =
+    strsplit(match, "/", { ignore_escaped = true })
 
   if #matches ~= 3 then
-    error("spec should be {var_name, pattern, replacement}, got " .. match)
+    error(
+      "spec should be {var_name, pattern, replacement}, got "
+        .. match
+    )
   end
 
   local var, regex, with = unpack(matches)
@@ -88,7 +92,9 @@ function parse.match(match, repl)
 
   local ok = repl[var]:match(regex)
   if not ok then
-    error("match failure for " .. match .. " using " .. regex)
+    error(
+      "match failure for " .. match .. " using " .. regex
+    )
   end
 
   return ok
@@ -96,7 +102,8 @@ end
 
 function parse.parse(match, repl)
   local sed_open = match:find "[^\\]/"
-  local sed_close = sed_open and match:find("[^\\]/", sed_open + 1)
+  local sed_close = sed_open
+    and match:find("[^\\]/", sed_open + 1)
 
   if sed_open and sed_close then
     return parse.sed(match, repl)
@@ -137,7 +144,9 @@ local function gmatch(s, repl)
       return v
     end
 
-  local pat = Ct((before * paren_open * chars * paren_close * before) ^ 0)
+  local pat = Ct(
+    (before * paren_open * chars * paren_close * before) ^ 0
+  )
   local ok = pat:match(s)
 
   if #ok > 0 then

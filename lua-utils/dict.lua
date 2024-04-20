@@ -1,11 +1,11 @@
-require 'lua-utils.list'
+require "lua-utils.list"
 
 local function is_size(x, n)
   return size(x) == n
 end
 
 local function is_table(x)
-  return type(x) == 'table'
+  return type(x) == "table"
 end
 
 local function is_length(x, n)
@@ -13,10 +13,10 @@ local function is_length(x, n)
 end
 
 dict = {
-  keys = function (x)
+  keys = function(x)
     return keys(x)
   end,
-  values = function (x)
+  values = function(x)
     return values(x)
   end,
 }
@@ -170,12 +170,12 @@ end
 
 function dict.mem_lmerge(x, ...)
   local args = { ... }
-  local cache = setmetatable({}, {__mode = 'kv'})
+  local cache = setmetatable({}, { __mode = "kv" })
 
   for i = 1, #args do
     local X = x
     local Y = args[i]
-    local queue = setmetatable({}, {__mode == 'kv'})
+    local queue = setmetatable({}, { __mode == "kv" })
 
     if not is_table(Y) then
       error(i .. ": expected table, got " .. type(Y))
@@ -216,12 +216,12 @@ end
 
 function dict.mem_merge(x, ...)
   local args = { ... }
-  local cache = setmetatable({}, {__mode = 'kv'})
+  local cache = setmetatable({}, { __mode = "kv" })
 
   for i = 1, #args do
     local X = x
     local Y = args[i]
-    local queue = setmetatable({}, {__mode = 'kv'})
+    local queue = setmetatable({}, { __mode = "kv" })
 
     if not is_table(Y) then
       error(i .. ": expected table, got " .. type(Y))
@@ -233,8 +233,8 @@ function dict.mem_merge(x, ...)
 
         if is_table(value) then
           if is_table(x_value) then
-						queue[#queue + 1] = { x_value, value }
-					else
+            queue[#queue + 1] = { x_value, value }
+          else
             X[key] = value
           end
         else
@@ -261,7 +261,7 @@ function dict.lmerge(x, ...)
   for i = 1, #args do
     local X = x
     local Y = args[i]
-    local queue = setmetatable({}, {__mode == 'kv'})
+    local queue = setmetatable({}, { __mode == "kv" })
 
     if not is_table(Y) then
       error(i .. ": expected table, got " .. type(Y))
@@ -273,8 +273,8 @@ function dict.lmerge(x, ...)
 
         if is_table(value) then
           if is_table(x_value) then
-						queue[#queue + 1] = { x_value, value }
-					elseif is_nil(x_value) then
+            queue[#queue + 1] = { x_value, value }
+          elseif is_nil(x_value) then
             X[key] = value
           end
         elseif is_nil(x_value) then
@@ -297,12 +297,12 @@ end
 
 function dict.merge(x, ...)
   local args = { ... }
-  local cache = setmetatable({}, {__mode = 'kv'})
+  local cache = setmetatable({}, { __mode = "kv" })
 
   for i = 1, #args do
     local X = x
     local Y = args[i]
-    local queue = setmetatable({}, {__mode = 'kv'})
+    local queue = setmetatable({}, { __mode = "kv" })
 
     if not is_table(Y) then
       error(i .. ": expected table, got " .. type(Y))
@@ -314,8 +314,8 @@ function dict.merge(x, ...)
 
         if is_table(value) then
           if is_table(x_value) then
-						queue[#queue + 1] = { x_value, value }
-					else
+            queue[#queue + 1] = { x_value, value }
+          else
             X[key] = value
           end
         else
@@ -341,7 +341,7 @@ end
 --- @return table
 function dict.from_zipped(zipped)
   local out = {}
-  dict.each(zipped, function (z)
+  dict.each(zipped, function(z)
     out[z[1]] = z[2]
   end)
   return out
@@ -355,7 +355,8 @@ function dict.from_list(X, default)
   local res = {}
   for i = 1, #X do
     if default then
-      res[X[i]] = is_method(default) and default() or default
+      res[X[i]] = is_method(default) and default()
+        or default
     else
       res[X[i]] = true
     end
@@ -364,17 +365,18 @@ function dict.from_list(X, default)
 end
 
 function dict.eq(a, b, opts)
-  if type(opts) == 'boolean' then
-    opts = {absolute = opts}
+  if type(opts) == "boolean" then
+    opts = { absolute = opts }
   end
 
   opts = opts or {}
   local abs = opts.absolute or opts.abs
   local state = not abs and {}
 
-  local cmp = opts.eq or function (x, y)
-    return x == y
-  end
+  local cmp = opts.eq
+    or function(x, y)
+      return x == y
+    end
 
   local function rec(x, y, _state)
     for key, b in pairs(y) do
@@ -410,67 +412,67 @@ end
 dict.get = at
 
 function dict.fset(x, ks, value)
-	ks.length = #ks
-	local tmp = x
+  ks.length = #ks
+  local tmp = x
 
-	for i=1, ks.length-1 do
-		if type(tmp[ks[i]]) == 'table' then
-			tmp = tmp[ks[i]]
-		else
-			tmp[ks[i]] = {}
-			tmp = tmp[ks[i]]
-		end
-	end
+  for i = 1, ks.length - 1 do
+    if type(tmp[ks[i]]) == "table" then
+      tmp = tmp[ks[i]]
+    else
+      tmp[ks[i]] = {}
+      tmp = tmp[ks[i]]
+    end
+  end
 
-	tmp[ks[ks.length]] = value
+  tmp[ks[ks.length]] = value
 
-	return x
+  return x
 end
 
 function dict.set(x, ks, value)
-	ks.length = #ks
-	local tmp = x
+  ks.length = #ks
+  local tmp = x
 
-	for i=1, ks.length-1 do
-		if type(tmp[ks[i]]) == 'table' then
-			tmp = tmp[ks[i]]
-		else
-			return
-		end
-	end
+  for i = 1, ks.length - 1 do
+    if type(tmp[ks[i]]) == "table" then
+      tmp = tmp[ks[i]]
+    else
+      return
+    end
+  end
 
-	tmp[ks[ks.length]] = value
-	return x
+  tmp[ks[ks.length]] = value
+  return x
 end
 
 function dict.update(x, ks, default, fn)
-	ks = totable(ks)
-	ks.length = #ks
-	local tmp = x
+  ks = totable(ks)
+  ks.length = #ks
+  local tmp = x
 
-	for i=1, ks.length-1 do
-		if type(tmp[ks[i]]) == 'table' then
-			tmp = tmp[ks[i]]
-		else
-			return
-		end
-	end
+  for i = 1, ks.length - 1 do
+    if type(tmp[ks[i]]) == "table" then
+      tmp = tmp[ks[i]]
+    else
+      return
+    end
+  end
 
-	local value
-	local has = tmp[ks[ks.length]]
+  local value
+  local has = tmp[ks[ks.length]]
 
-	if has ~= nil then
-		if fn then
-			value = fn(has)
-		else
-			value = has
-		end
-	elseif default ~= nil then
-		value = default
-	else
-		value = true
-	end
+  if has ~= nil then
+    if fn then
+      value = fn(has)
+    else
+      value = has
+    end
+  elseif default ~= nil then
+    value = default
+  else
+    value = true
+  end
 
-	tmp[ks[ks.length]] = value
-	return x
+  tmp[ks[ks.length]] = value
+  return x
 end

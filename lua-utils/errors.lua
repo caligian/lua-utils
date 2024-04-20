@@ -1,10 +1,10 @@
-require 'lua-utils.types'
+require "lua-utils.types"
 
 errors = class:new()
 types.error = {
   throw = types.method,
   is = types.method,
-  message = types.string
+  message = types.string,
 }
 
 function errors:init(msg, parent)
@@ -22,7 +22,7 @@ function errors:__tostring(context)
 
   local function recursive_convert(x)
     if x.parent then
-      parent_errors[#parent_errors+1] = x.parent.message
+      parent_errors[#parent_errors + 1] = x.parent.message
       recursive_convert(x.parent)
     end
   end

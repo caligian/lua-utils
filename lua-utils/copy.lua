@@ -56,11 +56,11 @@ end
 function copy.table(x, opts)
   if type(x) ~= "table" then
     return
-	elseif type(opts) ~= 'table' then
-		opts = {metatable = opts}
-	end
+  elseif type(opts) ~= "table" then
+    opts = { metatable = opts }
+  end
 
-	opts = opts or {}
+  opts = opts or {}
   local out = {}
   local f = opts.map
   local cp_mt = opts.metatable
@@ -79,7 +79,6 @@ function copy.table(x, opts)
   return out
 end
 
-
 --- Copy table as list
 --- @param x table
 --- @param opts? {metatable?: boolean, map?: function} opts for copying
@@ -87,8 +86,8 @@ end
 function copy.list(x, cp_mt)
   if type(x) ~= "table" then
     return
-	elseif type(opts) ~= 'table' then
-		opts = {metatable = opts}
+  elseif type(opts) ~= "table" then
+    opts = { metatable = opts }
   end
 
   opts = opts or {}
@@ -110,7 +109,16 @@ function copy.list(x, cp_mt)
   return out
 end
 
-local function deep_copy_table(x, cp_mt, queue, cache, res, depth, current_depth, f)
+local function deep_copy_table(
+  x,
+  cp_mt,
+  queue,
+  cache,
+  res,
+  depth,
+  current_depth,
+  f
+)
   if not x then
     return
   end
@@ -166,7 +174,16 @@ local function deep_copy_table(x, cp_mt, queue, cache, res, depth, current_depth
   deep_copy_table(unpack(next))
 end
 
-local function deep_copy_list(x, cp_mt, queue, cache, res, depth, current_depth, f)
+local function deep_copy_list(
+  x,
+  cp_mt,
+  queue,
+  cache,
+  res,
+  depth,
+  current_depth,
+  f
+)
   if not x then
     return
   end
@@ -233,7 +250,16 @@ function copy.deep.table(x, opts)
   local queue = {}
   local cache = weak_table()
   local result = {}
-  deep_copy_table(x, opts.metatable, queue, cache, result, opts.depth, 1, opts.map)
+  deep_copy_table(
+    x,
+    opts.metatable,
+    queue,
+    cache,
+    result,
+    opts.depth,
+    1,
+    opts.map
+  )
 
   return result
 end
@@ -247,7 +273,16 @@ function copy.deep.list(x, opts)
   local queue = {}
   local cache = weak_table()
   local result = {}
-  deep_copy_list(x, opts.metatable, queue, cache, result, opts.depth, 1, opts.map)
+  deep_copy_list(
+    x,
+    opts.metatable,
+    queue,
+    cache,
+    result,
+    opts.depth,
+    1,
+    opts.map
+  )
 
   return result
 end

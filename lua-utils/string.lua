@@ -6,13 +6,13 @@ substr = string.sub
 --- @field plain? boolean match pattern plainly instead of using regex
 --- @field escaped? boolean ignore escaped pattern
 --- @field ignore_escaped? boolean alias for escaped
---- @field capture? boolean capture the string matched 
+--- @field capture? boolean capture the string matched
 --- @field init? number init position
 
 --- @class strfind.result
 --- @field [1] number init pos
 --- @field [2] number end pos
---- @field [3] string captured string 
+--- @field [3] string captured string
 
 --- Find the index of string `sep`
 --- @param x string
@@ -30,7 +30,8 @@ function strfind(x, sep, opts)
   local results_len = 0
 
   local function get_next_sep(start_from)
-    local next_sep = { string.find(x, sep, start_from, plain) }
+    local next_sep =
+      { string.find(x, sep, start_from, plain) }
 
     if #next_sep == 0 then
       return
@@ -207,7 +208,7 @@ end
 
 --- Check if pattern matches at the beginning of the string
 --- @param x string
---- @param s string 
+--- @param s string
 --- @return string?
 function startswith(x, s)
   return x:match("^" .. s)
@@ -215,7 +216,7 @@ end
 
 --- Check if pattern matches at the end of the string
 --- @param x string
---- @param s string 
+--- @param s string
 --- @return string?
 function endswith(x, s)
   return x:match(s .. "$")

@@ -78,7 +78,10 @@ function Argparser.Option:init(specs)
     ["required?"] = "boolean",
   }].options(specs)
 
-  assert(specs.long or specs.short, ".long or .short missing in " .. dump(specs))
+  assert(
+    specs.long or specs.short,
+    ".long or .short missing in " .. dump(specs)
+  )
 
   specs.name = specs.name or specs.long or specs.short
   specs.help = specs.help or ""
@@ -195,15 +198,32 @@ local function validateargs(switch)
 
   if is_number(nargs) then
     if nargs ~= passed then
-      error(name .. ": " .. "expected " .. nargs .. ", got " .. passed)
+      error(
+        name
+          .. ": "
+          .. "expected "
+          .. nargs
+          .. ", got "
+          .. passed
+      )
     end
   elseif nargs == "?" then
     if passed ~= 0 or passed ~= 1 then
-      error(name .. ": " .. "expected 1 or 0 args, got " .. passed)
+      error(
+        name
+          .. ": "
+          .. "expected 1 or 0 args, got "
+          .. passed
+      )
     end
   elseif nargs == "+" then
     if passed == 0 then
-      error(name .. ": " .. "expected more than 0 args, got " .. passed)
+      error(
+        name
+          .. ": "
+          .. "expected more than 0 args, got "
+          .. passed
+      )
     end
   end
 
@@ -260,7 +280,9 @@ function Argparser:parse(args)
 
   if nargs == "?" then
     if passed ~= 0 and passed ~= 1 then
-      error(name .. ": expected 1 or 0 args, got " .. passed)
+      error(
+        name .. ": expected 1 or 0 args, got " .. passed
+      )
     elseif passed > nargs then
       tail = list.sub(givenargs --[[@as list]], 2, -1)
       last.args = {
@@ -269,13 +291,18 @@ function Argparser:parse(args)
     end
   elseif nargs == "+" then
     if passed == 0 then
-      error(name .. ": expected at least 1 arg, got " .. passed)
+      error(
+        name .. ": expected at least 1 arg, got " .. passed
+      )
     end
   elseif is_number(nargs) then
     if nargs > passed then
-      error(name .. ": expected " .. nargs .. ", got " .. passed)
+      error(
+        name .. ": expected " .. nargs .. ", got " .. passed
+      )
     else
-      tail = list.sub(givenargs--[[@as list]], nargs + 1, -1)
+      tail =
+        list.sub(givenargs--[[@as list]], nargs + 1, -1)
       ---@diagnostic disable-next-line
       last.args = list.sub(givenargs, 1, nargs)
     end
@@ -287,7 +314,8 @@ function Argparser:parse(args)
   if first ~= last then
     if first.index[1] ~= 1 then
       ---@diagnostic disable-next-line: cast-local-type
-      head = list.sub(args --[[@as list]], 1, first.index[1] - 1)
+      head =
+        list.sub(args --[[@as list]], 1, first.index[1] - 1)
     end
   end
 
@@ -377,14 +405,16 @@ local function wrap_lines(full_name, help)
     totalhelp[#totalhelp + 1] = "\n"
     totalhelp[#totalhelp + 1] = string.rep(" ", maxlen)
   else
-    totalhelp[#totalhelp + 1] = string.rep(" ", maxlen - optlen)
+    totalhelp[#totalhelp + 1] =
+      string.rep(" ", maxlen - optlen)
   end
 
   local ctr = 0
   for value in string.gmatch(help, "[^%s]+") do
     if ctr > maxlen then
       ctr = 0
-      totalhelp[#totalhelp + 1] = "\n" .. string.rep(" ", maxlen + 1)
+      totalhelp[#totalhelp + 1] = "\n"
+        .. string.rep(" ", maxlen + 1)
     else
       ctr = ctr + #value
       totalhelp[#totalhelp + 1] = " "
@@ -422,7 +452,9 @@ function Argparser.Option:tostring()
   nargs = tostring(self.nargs)
   short = self.short and "-" .. self.short
   long = self.long and "--" .. self.long
-  name = (long and short) and short .. ", " .. long or short or long
+  name = (long and short) and short .. ", " .. long
+    or short
+    or long
 
   if nargs ~= "0" and nargs ~= "?" then
     if required then
@@ -483,7 +515,8 @@ function Argparser:tostring()
   return join(usage, "\n")
 end
 
-local s = "1 2 3 4 --help --name 1 -a 2 --name 2 3 4 10 --b-name 1 2 3 4 5 -b -1"
+local s =
+  "1 2 3 4 --help --name 1 -a 2 --name 2 3 4 10 --b-name 1 2 3 4 5 -b -1"
 local parser = Argparser("Hello world", "!")
 parser.args = strsplit(s, " ")
 

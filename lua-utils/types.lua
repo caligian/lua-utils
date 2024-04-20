@@ -31,12 +31,11 @@ types = {
   },
 }
 
-for key, value in pairs(types.builtin) do
+for key, _ in pairs(types.builtin) do
   types[key] = function(x, dmp)
     local ok = type(x) == key
     if dmp and not ok then
-      return false,
-        ("expected " .. key .. " got " .. dump(x))
+      return false, { expected = key, got = x }
     elseif not ok then
       return false
     end
@@ -51,9 +50,12 @@ function types.method(self, dmp)
   elseif type(self) ~= "table" then
     if dmp then
       return false,
-        "expected table with __call|function, got " .. dump(
-          self
-        )
+        {
+          expected = "table with __call or function",
+          got = self,
+        }
+    else
+      return false
     end
   end
 
@@ -63,7 +65,7 @@ function types.method(self, dmp)
   end
 
   if dmp then
-    return false, "expected method, got " .. dump(self)
+    return false, { expected = "method", got = self }
   end
 
   return false
@@ -75,8 +77,7 @@ function types.not_empty(x, dmp)
   end
   local ok = size(x) ~= 0
   if not ok and dmp then
-    return false,
-      "expected non-empty table, got " .. dump(x)
+    return false, { expected = "non-empty table", got = x }
   elseif not ok then
     return false
   end
@@ -89,7 +90,7 @@ function types.empty(x, dmp)
   end
   local ok = size(x) == 0
   if not ok and dmp then
-    return false, "expected empty table, got " .. dump(x)
+    return false, { expected = "empty table", got = x }
   elseif not ok then
     return false
   end
@@ -102,7 +103,7 @@ function types.list(x, dmp)
   end
   local ok = size(x) == #x
   if not ok and dmp then
-    return false, "expected list, got " .. dump(x)
+    return false, { expected = "list", got = x }
   elseif not ok then
     return false
   end
@@ -115,7 +116,7 @@ function types.dict(x, dmp)
   end
   local ok = size(x) ~= #x
   if not ok and dmp then
-    return false, "expected dict, got " .. dump(x)
+    return false, { expected = "dict", got = x }
   elseif not ok then
     return false
   end
@@ -127,7 +128,6 @@ local function cmp_other(x, y, dmp)
     return true
   end
 
-  local ok, msg
   if types.method(y) then
     if dmp then
       return y(x, true)
@@ -136,10 +136,9 @@ local function cmp_other(x, y, dmp)
     end
   end
 
-  ok = x == y
-  if not ok then
+  if x ~= y then
     if dmp then
-      return false, dump { expected = true }
+      return false, { expected = y, got = x }
     else
       return false
     end
@@ -167,7 +166,7 @@ local function get(a, key)
 
     if X == nil then
       if opt then
-        return nil, "skip"
+        return nil, true
       else
         return
       end
@@ -177,7 +176,7 @@ local function get(a, key)
   return X
 end
 
-local function next(a, b, dest, dmp)
+local function next(a, b, prefix, dmp)
   if a == b then
     return { ok = true }
   end
@@ -186,40 +185,33 @@ local function next(a, b, dest, dmp)
   local B_t = types.table(b) and not types.method(b)
 
   if not A_t and not B_t then
-    local ok, msg
-    if dmp then
-      ok, msg = cmp_other(a, b, true)
-    else
-      ok = cmp_other(a, b)
-    end
-
+    local ok, msg = cmp_other(a, b, dmp)
     if not ok then
       return {
-        ok = false,
-        msg = msg and prefix .. ": " .. msg,
+        level = prefix,
+        msg = msg,
       }
     else
       return { ok = true }
     end
   elseif not B_t or not A_t then
-    return { ok = false }
+    return {}
   else
-    local ok, msg = cmp_other(a, b, dmp)
-    return { ok = ok, msg = msg and prefix .. ": " .. msg }
+    return { table = true }
   end
-
-  return { table = true }
 end
 
 local function cmp_table(x, spec, prefix, dmp)
   prefix = prefix or "<base>"
 
   if not types.table(x) then
-    local ok, msg = cmp_other(x, spec, dmp)
-    if not ok and msg then
-      msg = prefix .. ": " .. msg
-    end
-    return { ok = ok, msg = msg }
+    return {
+      level = prefix,
+      msg = {
+        expected = "table",
+        got = x,
+      },
+    }
   end
 
   for key, Y in pairs(spec) do
@@ -229,12 +221,12 @@ local function cmp_table(x, spec, prefix, dmp)
     if not skip then
       if X == nil then
         return {
-          ok = false,
-          msg = dmp and k .. ": " .. "expected non-nil",
+          level = k,
+          msg = { expected = "non-nil" },
         }
       end
 
-      local ok = next(X, Y, k)
+      local ok = next(X, Y, k, dmp)
       if ok.table then
         ok = cmp_table(X, Y, k, dmp)
         if not ok.ok then
@@ -260,10 +252,9 @@ function types.is_a(x, y, dmp)
   end
 
   if not res.ok then
+    res.obj = x
     if dmp then
-      local msg = res.msg
-        or "validation failed for " .. dump(x)
-      return false, msg
+      return false, res
     else
       return false
     end
@@ -273,8 +264,12 @@ function types.is_a(x, y, dmp)
 end
 
 is_a = mtset({
+  opt = {},
   assert = function(x, y)
-    assert(types.is_a(x, y, true))
+    local ok, msg = types.is_a(x, y, true)
+    if not ok then
+      error(dump(msg))
+    end
     return true
   end,
   dump = function(x, y)
@@ -295,85 +290,47 @@ is_a = mtset({
   end,
 })
 
+function is_a.opt.assert(x, y)
+  if x == nil then
+    return true
+  end
+  return is_a.assert(x, y)
+end
+
+function is_a.opt.dump(x, y)
+  if x == nil then
+    return true
+  end
+  return is_a.dump(x, y)
+end
+
 function is_a.match(specs)
   for key, value in pairs(specs) do
-    local eq, format, _assert
-    compare = value.compare
-    format = value.format
-    with = value.with
-    opt = value.opt
-
-    if with == nil then
-      error(dump(key) .. ".with: expected non-nil value")
-    end
+    local compare = value[1]
+    local with = value.type
+    local opt = key:match "^opt_"
 
     if not opt and compare == nil then
-      error(dump(key) .. ".compare: expected non-nil value")
+      error(dump {
+        spec = key,
+        expected = "non-nil object",
+      })
+    end
+
+    if with == nil then
+      error(dump {
+        spec = key,
+        expected = "non-nil type spec",
+      })
     end
 
     local ok, msg = types.is_a(compare, with, true)
     if not ok then
-      msg = dump(key) .. ": " .. msg
-      error(msg)
+      msg = msg or {}
+      msg.spec = key
+      error(dump(msg))
     end
   end
-end
-
-class = {}
-class.__index = class
-
-function class:implements(...)
-  local args = { ... }
-  for i = 1, #args do
-    if types.is_a(self, args[i]) then
-      return args[i]
-    end
-  end
-  return false
-end
-
-function class:include(...)
-  local args = { ... }
-  for i = 1, #args do
-    for key, value in pairs(args[i]) do
-      if self[key] == nil then
-        self[key] = value
-      end
-    end
-  end
-  return self
-end
-
-class.is_a = class.implements
-
-function class:new(cls)
-  if types.string(cls) then
-    _G[cls] = {}
-    cls = _G[cls]
-  else
-    cls = cls or {}
-  end
-
-  for key, value in pairs(class) do
-    cls[key] = value
-  end
-
-  cls.__index = cls
-
-  function cls:new(...)
-    local obj = mtset({}, cls)
-    for key, value in pairs(self) do
-      obj[key] = value
-    end
-    if self.init then
-      return self.init(obj, ...)
-    end
-    return obj, ...
-  end
-
-  mtset(cls, class)
-
-  return cls
 end
 
 function implements(x, ...)
@@ -389,16 +346,17 @@ end
 function union(...)
   local _types = { ... }
   return function(x)
-    local fail = {}
+    local fail = { obj = x }
     for i = 1, #_types do
       local ok, msg = types.is_a(x, _types[i], true)
       if ok then
         return true
       elseif msg then
+        msg.obj = nil
         fail[#fail + 1] = msg
       end
     end
-    return false, table.concat(fail, "\n")
+    return false, fail
   end
 end
 
@@ -407,6 +365,7 @@ function types.gen_guard(name, spec)
     spec = name
     name = nil
   end
+
   local mt = {}
   local g = {}
   local opt_mt = {}
@@ -416,15 +375,14 @@ function types.gen_guard(name, spec)
   mtset(g.opt, opt_mt)
 
   function g.dump(x)
-    local ok, msg = is_a(x, spec, true)
-    if ok then
-      return true
-    end
-    return false, msg
+    return is_a(x, spec, true)
   end
 
   function g.assert(x)
-    assert(g.dump(x))
+    local ok, msg = g.dump(x)
+    if not ok then
+      error(dump(msg))
+    end
     return true
   end
 
@@ -451,7 +409,7 @@ function types.gen_guard(name, spec)
     if ok then
       return true
     end
-    error(msg)
+    error(dump(msg))
   end
 
   if name then
@@ -459,18 +417,6 @@ function types.gen_guard(name, spec)
   end
 
   return g
-end
-
-for key, value in pairs(types) do
-  if
-    key ~= "builtin"
-    and key ~= "metaevents"
-    and key ~= "gen_guard"
-    and key ~= "define"
-    and key ~= "is_a"
-  then
-    types.gen_guard(key, value)
-  end
 end
 
 function types.define(...)
@@ -541,6 +487,76 @@ function optional(...)
     end
     return union(unpack(args))(x)
   end
+end
+
+for key, value in pairs(types) do
+  if
+    key ~= "builtin"
+    and key ~= "metaevents"
+    and key ~= "gen_guard"
+    and key ~= "define"
+    and key ~= "is_a"
+  then
+    types.gen_guard(key, value)
+  end
+end
+
+--------------------------------------------------
+class = {}
+class.__index = class
+
+function class:implements(...)
+  local args = { ... }
+  for i = 1, #args do
+    if types.is_a(self, args[i]) then
+      return args[i]
+    end
+  end
+  return false
+end
+
+function class:include(...)
+  local args = { ... }
+  for i = 1, #args do
+    for key, value in pairs(args[i]) do
+      if self[key] == nil then
+        self[key] = value
+      end
+    end
+  end
+  return self
+end
+
+class.is_a = class.implements
+
+function class:new(cls)
+  if types.string(cls) then
+    _G[cls] = {}
+    cls = _G[cls]
+  else
+    cls = cls or {}
+  end
+
+  for key, value in pairs(class) do
+    cls[key] = value
+  end
+
+  cls.__index = cls
+
+  function cls:new(...)
+    local obj = mtset({}, cls)
+    for key, value in pairs(self) do
+      obj[key] = value
+    end
+    if self.init then
+      return self.init(obj, ...)
+    end
+    return obj, ...
+  end
+
+  mtset(cls, class)
+
+  return cls
 end
 
 -- local mm = defmulti()

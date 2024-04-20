@@ -1,66 +1,49 @@
-inspect = require 'inspect'
+inspect = require "inspect"
 dump = inspect.inspect
 
 function size(x)
-	local n = 0
-	for _, _ in pairs(x) do
-		n = n + 1
-	end
-	return n
+  local n = 0
+  for _, _ in pairs(x) do
+    n = n + 1
+  end
+  return n
 end
 
 function mtget(t, k)
-	if not k then return getmetatable(t) end
+  if not k then
+    return getmetatable(t)
+  end
 
-	local mt = getmetatable(t)
-	if not mt then return end
+  local mt = getmetatable(t)
+  if not mt then
+    return
+  end
 
-	return mt[k]
+  return mt[k]
 end
 
 function mtset(t, k, v)
-	if type(k) == 'table' then 
-		return setmetatable(t, k)
-	end
+  if type(k) == "table" then
+    return setmetatable(t, k)
+  end
 
-	local mt = getmetatable(t) or {}
-	mt[k] = v
+  local mt = getmetatable(t) or {}
+  mt[k] = v
 
-	return setmetatable(t, mt)
-end
-
-function errorf(err, fmt, ...)
-	local args = {...}
-	for i=1, #args do
-		if type(args[i]) ~= 'string' then
-			args[i] = dump(args[i])
-		end
-	end
-	error(dump {
-		error = err,
-		message = string.format(fmt, unpack(args))
-	})
-end
-
-function typeof(x) 
-	local tp = type(x)
-	if tp == 'table' then
-		return x._meta and x._meta.type or 'table'
-	end
-	return tp
+  return setmetatable(t, mt)
 end
 
 function tolist(x, force)
-	if force then
-		return {x}
-	elseif type(x) == 'table' then
-		if x._meta then
-			return {x}
-		end
-		return x
-	else
-		return {x}
-	end
+  if force then
+    return { x }
+  elseif type(x) == "table" then
+    if x._meta then
+      return { x }
+    end
+    return x
+  else
+    return { x }
+  end
 end
 
 function is_nil(x)
@@ -74,7 +57,7 @@ end
 function keys(x)
   local ks = {}
   for key, _ in pairs(x) do
-    ks[#ks+1] = key
+    ks[#ks + 1] = key
   end
   return ks
 end
@@ -83,19 +66,19 @@ function values(x)
   local vs = {}
   local ks = {}
   for _, value in pairs(x) do
-    vs[#ks+1] = value
+    vs[#ks + 1] = value
   end
   return vs
 end
 
 function at(x, ...)
-  local ks = {...}
+  local ks = { ... }
   local tmp = x
 
-  for i = 1, #ks-1 do
+  for i = 1, #ks - 1 do
     local key = ks[i]
     local v = x[key]
-    if type(v) ~= 'table' then
+    if type(v) ~= "table" then
       return nil
     else
       tmp = v
@@ -111,7 +94,10 @@ function at(x, ...)
 end
 
 function is_method(x)
-  return type(x) == 'function' or type(x) == 'table' and x._meta and x._meta.type == 'method'
+  return type(x) == "function"
+    or type(x) == "table"
+      and x._meta
+      and x._meta.type == "method"
 end
 
 --- Alias for table.concat
@@ -264,7 +250,7 @@ end
 
 totable = tolist
 
-require 'lua-utils.tuple'
-require 'lua-utils.copy'
-require 'lua-utils.function'
-require 'lua-utils.string'
+require "lua-utils.tuple"
+require "lua-utils.copy"
+require "lua-utils.function"
+require "lua-utils.string"

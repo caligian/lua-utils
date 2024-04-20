@@ -1,1 +1,1 @@
-require 'lua-utils.dict'
+require "lua-utils.dict"
