@@ -103,12 +103,30 @@ end
 ---@param x table 
 ---@param ... any
 ---@return table
+function list.lextend(x, ...)
+  local lextend = function (a, b)
+    if type(b) == 'table' then
+      list.unpush(a, unpack(b))
+    else
+      list.unpush(a, b)
+    end
+  end
+
+  for _, arg in ipairs({...}) do
+    lextend(x, arg)
+  end
+
+  return x
+end
+
+---Push elements or extend table at the end
+---@param x table 
+---@param ... any
+---@return table
 function list.extend(x, ...)
   for _, arg in ipairs({...}) do
     if type(arg) == 'table' then
-      for i=1, #arg do
-        list.append(x, arg[i])
-      end
+      for i=1, #arg do list.append(x, arg[i]) end
     else
       list.append(x, arg)
     end
