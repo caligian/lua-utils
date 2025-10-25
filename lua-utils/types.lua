@@ -156,6 +156,7 @@ function types.hasmetatable(x)
   return true
 end
 
+
 ---Is value a table without metatable?
 ---@param x any
 ---@return boolean, string? 
@@ -202,7 +203,7 @@ function types.pure_list(x)
     local ok, msg = types.list(x)
     if not ok then
       return false, msg
-    elseif types.has_metatable(x) then
+    elseif types.hasmetatable(x) then
       return false, sprintf('expected list without metatable, got %s', x)
     else
       return true
@@ -640,6 +641,7 @@ function types.exception(x)
   return true
 end
 
+types.has_metatable = types.hasmetatable
 types.hasmt = types.hasmetatable
 types.U = types.union
 types.O = types.optional

@@ -381,18 +381,8 @@ function Argparser:parse(args)
   return pos, parsed
 end
 
---[[
-
--a                   Print your bloody arse over and here and then eat shit.
---another-flag    
-
--x STR[+]            this is the description for this option. It will wrap
---long-name STR[+]   wrap when the description is beyond 60 characters
-
---]]
-
-local function wrap_lines(full_name, help)
-  local maxlen = 30
+local function wrap_lines(full_name, help, maxlen)
+  maxlen = maxlen or 30
   local optlen = #full_name
   local totalhelp = { full_name }
 
@@ -421,7 +411,7 @@ local function wrap_lines(full_name, help)
   return list.join(totalhelp, "")
 end
 
-function Argparser.Positional:tostring()
+function Argparser.Positional:tostring(maxlen)
   local metavar, required, help, name
   help = self.help or ""
   metavar = self.metavar
@@ -436,10 +426,10 @@ function Argparser.Positional:tostring()
 
   name = name .. " " .. metavar
 
-  return wrap_lines(name, help)
+  return wrap_lines(name, help, maxlen)
 end
 
-function Argparser.Option:tostring()
+function Argparser.Option:tostring(maxlen)
   local metavar, required, nargs, help, name
   help = self.help or ""
   metavar = self.metavar
@@ -463,10 +453,10 @@ function Argparser.Option:tostring()
     name = name .. " " .. metavar
   end
 
-  return wrap_lines(name, help)
+  return wrap_lines(name, help, maxlen)
 end
 
-function Argparser:tostring()
+function Argparser:tostring(maxlen)
   local header = self.header
   local summary = self.summary
   local scriptname
@@ -487,7 +477,7 @@ function Argparser:tostring()
     list.extend(
       usage,
       list.map(self.positional, function(x)
-        return x:tostring()
+        return x:tostring(maxlen)
       end)
     )
     pos_set = true
@@ -502,7 +492,7 @@ function Argparser:tostring()
     list.extend(
       usage,
       list.map(dict.values(self.options), function(x)
-        return x:tostring()
+        return x:tostring(maxlen)
       end)
     )
   end

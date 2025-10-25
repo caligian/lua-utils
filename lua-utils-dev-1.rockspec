@@ -10,14 +10,16 @@ description = {
   license = "MIT <http://opensource.org/licenses/MIT>",
 }
 
-dependencies = { "lua >= 5.1", "lpeg" }
+dependencies = { "lua >= 5.1", "lpath", 'luv' }
 
 build = {
   type = "builtin",
   modules = {
     ["lua-utils"] = "lua-utils/init.lua",
     ['lua-utils.utils'] = 'lua-utils/utils.lua',
+    ['lua-utils.validate'] = 'lua-utils/validate.lua',
     ['lua-utils.list'] = 'lua-utils/list.lua',
+    ['lua-utils.types'] = 'lua-utils/types.lua',
     ['lua-utils.dict'] = 'lua-utils/dict.lua',
     ['lua-utils.string'] = 'lua-utils/string.lua',
     ['lua-utils.multimethod'] = 'lua-utils/multimethod.lua',

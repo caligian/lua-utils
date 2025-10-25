@@ -94,7 +94,7 @@ function template:__call(str, replacements)
       if type(s) == 'table' then
         local var = s[1]
         if var == '' then
-          error(sprintf('expected variable name, got nothing at word %d in %s', i, final))
+          error(sprintf('Expected variable name, got nothing at word %d in %s', i, final))
         end
 
         local found = repls[var]
@@ -103,7 +103,7 @@ function template:__call(str, replacements)
         else
           local opt = var:find('%?$')
           if not opt or opt == #s then
-            error(sprintf('no such placeholder: %s', var))
+            error(sprintf('No such placeholder: %s', var))
           end
 
           local default = opt and var:match('.+', opt + 1)
