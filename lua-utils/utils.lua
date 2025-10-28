@@ -219,6 +219,7 @@ function spit(s, filename)
   end
 
   fh:write(s)
+  fh:write("\n")
   fh:close()
 
   return #s
@@ -253,14 +254,12 @@ function writelines(lines, filename)
   local size = 0
   local l = #lines
 
-  for i=1, l - 1 do
+  for i=1, l do
     fh:write(lines[i])
     fh:write("\n")
     size = #lines[i] + 1
   end
 
-  fh:write(lines[l])
   fh:close()
-
   return size + #lines[l]
 end
