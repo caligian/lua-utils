@@ -331,5 +331,7 @@ path.fs.ls = path.ls
 path.getcwd = path.cwd
 path.fs.rm_r = path.fs.removedirs
 path.fs.rm = path.fs.remove
+path.fs.cp = path.fs.copy
+path.fs.ln = path.fs.symlink
 
 return path
