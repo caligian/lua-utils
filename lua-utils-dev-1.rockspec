@@ -31,5 +31,7 @@ build = {
     ['lua-utils.class'] = 'lua-utils/class.lua',
     ['lua-utils.cmp'] = 'lua-utils/cmp.lua',
     ['lua-utils.tuple'] = 'lua-utils/tuple.lua',
+    ['lua-utils.path'] = 'lua-utils/path_utils.lua',
+    ['lua-utils.path_utils'] = 'lua-utils/path_utils.lua',
   },
 }
