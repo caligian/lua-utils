@@ -115,16 +115,14 @@ function path.ls(dirname, opts)
     end
 
     for i = 1, #next_dirs do
-      list_files(
-        next_dirs[i],
-        {
-          depth = required_depth,
-          current_depth = current_depth + 1,
-          result = result,
-          stop_when = stop_when,
-          map = map
-        }
-      )
+      result[#result+1] = next_dirs[i]
+      list_files(next_dirs[i], {
+        depth = required_depth,
+        current_depth = current_depth + 1,
+        result = result,
+        stop_when = stop_when,
+        map = map
+      })
     end
   end
 
