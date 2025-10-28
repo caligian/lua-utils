@@ -117,6 +117,7 @@ function path.ls(dirname, opts)
     for i = 1, #next_dirs do
       result[#result+1] = next_dirs[i]
       list_files(next_dirs[i], {
+        include = include,
         depth = required_depth,
         current_depth = current_depth + 1,
         result = result,
