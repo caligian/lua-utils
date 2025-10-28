@@ -32,5 +32,6 @@ build = {
     ['lua-utils.cmp'] = 'lua-utils/cmp.lua',
     ['lua-utils.tuple'] = 'lua-utils/tuple.lua',
     ['lua-utils.path_utils'] = 'lua-utils/path_utils.lua',
+    ['lua-utils.process'] = 'lua-utils/process.lua',
   },
 }

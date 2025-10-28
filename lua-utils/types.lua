@@ -7,6 +7,20 @@ types.object = class.is_object
 types.instance = class.is_instance
 types.class = class.is_class
 
+---Is value thread
+---@param x any
+---@return boolean, string? 
+function types.thread(x)
+  if x == nil then
+    return false, 'expected thread, got nothing'
+  else
+    local ok
+    ok = type(x) == 'thread'
+    if not ok then return false, sprintf('expected thread, got %s', x) end
+    return true
+  end
+end
+
 ---Is value userdata
 ---@param x any
 ---@return boolean, string? 
@@ -647,6 +661,7 @@ types.U = types.union
 types.O = types.optional
 types.n = types.number
 types.t = types.table
+types.th = types.thread
 types.s = types.string
 types.b = types.boolean
 types.u = types.userdata
