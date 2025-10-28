@@ -193,3 +193,74 @@ function as_list(x, force)
     return {x}
   end
 end
+
+---Read a file
+---@param filename string
+---@return string?
+function slurp(filename)
+  local fh = io.open(filename, 'r')
+  if not fh then
+    return
+  end
+
+  local text = fh:read('*all')
+  fh:close()
+
+  return text
+end
+
+---Write text to a file
+---@param filename string
+---@return number?
+function spit(s, filename)
+  local fh = io.open(filename, 'w')
+  if not fh then
+    return
+  end
+
+  fh:write(s)
+  fh:close()
+
+  return #s
+end
+
+---Similar to slurp but returns list of strings
+---@param filename string
+---@return string[]?
+function readlines(filename)
+  local text = slurp(filename)
+  if not text then
+    return
+  end
+
+  local res = {}
+  for match in text:gmatch("[^\n]+") do
+    res[#res+1] = match
+  end
+
+  return res
+end
+
+---Similar to spit but writes list of strings separated by newline
+---@param filename string
+---@return number?
+function writelines(lines, filename)
+  local fh = io.open(filename, 'w')
+  if not fh then
+    return
+  end
+
+  local size = 0
+  local l = #lines
+
+  for i=1, l - 1 do
+    fh:write(lines[i])
+    fh:write("\n")
+    size = #lines[i] + 1
+  end
+
+  fh:write(lines[l])
+  fh:close()
+
+  return size + #lines[l]
+end
