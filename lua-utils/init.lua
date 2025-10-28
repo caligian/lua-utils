@@ -17,6 +17,8 @@ local M = {
   template = require 'lua-utils.template',
   exception = require 'lua-utils.exception',
   argparser = require 'lua-utils.argparser',
+  path = require 'lua-utils.path_utils',
+  process = require 'lua-utils.process',
 }
 
 return M
