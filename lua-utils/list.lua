@@ -440,7 +440,7 @@ end
 
 ---Sort table inplace
 ---@param x table
----@param cmp function
+---@param cmp? function
 ---@return table
 function list.sort(x, cmp)
   table.sort(x, cmp)
