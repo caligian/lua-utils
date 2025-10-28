@@ -5,6 +5,17 @@ local dict = require 'lua-utils.dict'
 local class = require 'lua-utils.class'
 local types = require 'lua-utils.types'
 local validate = require 'lua-utils.validate'
+local sys = require 'system'
+
+local function get_term_width(default)
+  default = default or 50
+  local nrow, ncol = sys.termsize()
+  if nrow == nil then
+    return default
+  else
+    return ncol
+  end
+end
 
 local function print_exit(msg, ...)
   printf(msg, ...)
@@ -405,7 +416,7 @@ function Argparser:_parse(args)
 end
 
 local function wrap_lines(full_name, help, maxlen)
-  maxlen = maxlen or 30
+  maxlen = get_term_width(maxlen)
   local optlen = #full_name
   local totalhelp = { full_name }
 

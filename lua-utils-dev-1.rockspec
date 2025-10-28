@@ -10,7 +10,7 @@ description = {
   license = "MIT <http://opensource.org/licenses/MIT>",
 }
 
-dependencies = { "lua >= 5.1", "lpath", 'luv' }
+dependencies = { "lua >= 5.1", "lpath", 'luv', 'luasystem' }
 
 build = {
   type = "builtin",
