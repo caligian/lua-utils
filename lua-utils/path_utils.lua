@@ -330,5 +330,6 @@ path.fs.ls_link = path.ls_link
 path.fs.ls = path.ls
 path.getcwd = path.cwd
 path.fs.rm_r = path.fs.removedirs
+path.fs.rm = path.fs.remove
 
 return path
