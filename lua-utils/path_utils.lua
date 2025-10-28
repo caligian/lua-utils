@@ -127,6 +127,7 @@ function path.ls(dirname, opts)
   end
 
   opts = opts or {}
+  dirname = path.abspath(dirname)
   local depth = opts.depth or 1
   local stop_when = opts.stop_when
   local include = opts.include
@@ -185,7 +186,9 @@ end
 ---@param dirname string
 ---@param filetype string required filetype
 function path.ls_type(dirname, filetype)
+  dirname = path.abspath(dirname)
   local res = {}
+
   for filename, ft in path.fs.dir(dirname) do
     if ft == filetype then
       res[#res + 1] = filename
@@ -267,6 +270,7 @@ end
 ---@param dirname string
 ---@return string?
 function path.is_git_dir(dirname)
+  dirname = path.abspath(dirname)
   local check = path(dirname, '.git')
   if path.is_dir(check) then
     return dirname
@@ -294,7 +298,7 @@ function path.git_dirs(dirname, depth)
     end
   end
 
-  find(dirname, 0)
+  find(path.abspath(dirname), 0)
   return res
 end
 
