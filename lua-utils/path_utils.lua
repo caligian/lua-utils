@@ -107,7 +107,7 @@ function path.ls(dirname, opts)
     local next_dirs = {}
 
     for filename, filetype in path.fs.dir(d) do
-      if filetype == 'dir' then
+      if filetype == 'dir' and filename:match(include_dir) then
         next_dirs[#next_dirs + 1] = filename
       elseif stop_when and stop_when(create_context(filename, filetype)) then
         result[#result + 1] = filename
