@@ -71,6 +71,7 @@ end
 ---@field stop_when? fun(context: ls_context): boolean Stop when the condition is true and return everything collected till then
 ---@field map? fun(context: ls_context) Apply this function to matched files and use the returning value
 ---@field include? string (default: .*) Include only these files in the result
+---@field include_dir? string (default: .*) Include only these directories while traversing
 
 ---List files recursively
 ---@param dirname string
@@ -94,6 +95,7 @@ function path.ls(dirname, opts)
     local result = _opts.result
     local stop_when = _opts.stop_when
     local include = _opts.include
+    local include_dir = _opts.include_dir
     local map = _opts.map
 
     if current_depth == required_depth then
@@ -101,6 +103,7 @@ function path.ls(dirname, opts)
     end
 
     include = include or '.*'
+    include_dir = include_dir or '.*'
     local next_dirs = {}
 
     for filename, filetype in path.fs.dir(d) do
@@ -122,7 +125,8 @@ function path.ls(dirname, opts)
         current_depth = current_depth + 1,
         result = result,
         stop_when = stop_when,
-        map = map
+        map = map,
+        include_dir = include_dir
       })
     end
   end
@@ -136,6 +140,7 @@ function path.ls(dirname, opts)
   local map = opts.map or function(x)
     return x.path
   end
+  local include_dir = opts.include_dir
 
   list_files(
     dirname,
@@ -145,7 +150,8 @@ function path.ls(dirname, opts)
       result = result,
       stop_when = stop_when,
       map = map,
-      include = include
+      include = include,
+      include_dir = include_dir
     }
   )
 
