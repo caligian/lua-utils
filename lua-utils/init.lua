@@ -1,6 +1,8 @@
 require 'lua-utils.utils'
 require 'lua-utils.string'
 
+unpack = unpack or table.unpack
+
 local M = {
   inspect = require 'lua-utils.inspect',
 	list = require 'lua-utils.list',
