@@ -541,7 +541,9 @@ function Argparser:parse(args)
   for _, kw in pairs(self.keyword_arguments) do
     local name = kw.name
     name = name:gsub('-', '_')
-    kwargs[name] = kw.args
+    if kw.times_passed > 0 then
+      kwargs[name] = kw.args
+    end
   end
 
   for i=1, #self.positional_arguments do
