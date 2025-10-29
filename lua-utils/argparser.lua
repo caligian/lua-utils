@@ -491,18 +491,27 @@ end
 
 function Argparser:tostring(maxlen)
   local header = self.header
-  local summary = self.summary
+  local summary = self.summary or ''
   local scriptname
   do
     local str = debug.getinfo(2, "S").source:sub(2)
     scriptname = str:match "^.*/(.*).lua$" or str
   end
 
-  local usage = {
-    (scriptname .. ": " .. summary) or "",
-    header or "",
-    "",
-  }
+  local usage = {}
+  if summary ~= '' then
+    usage = {
+      (scriptname .. ": " .. summary) or "",
+      header or "",
+      "",
+    }
+  else
+    usage = {
+      scriptname,
+      header or "",
+      "",
+    }
+  end
 
   local pos_set
   if #self.positional_arguments > 0 then
