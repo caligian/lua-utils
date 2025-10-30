@@ -10,6 +10,8 @@ local utils = require 'lua-utils.argparser.utils'
 local KeywordArgument = require 'lua-utils.argparser.keyword_argument'
 local PositionalArgument = require 'lua-utils.argparser.positional_argument'
 
+--- Parse defaults if possible
+
 ---@class ParsedArguments
 ---@field keyword_arguments table<string,any>
 ---@field positional_arguments any[]
@@ -173,6 +175,15 @@ end
 
 function Argparser:print_help(maxwidth)
   print(self:create_help(maxwidth))
+end
+
+function Argparser:print_help_and_exit(maxwidth, msg)
+  if msg then
+    print(self:create_help(maxwidth) .. '\n' .. msg)
+  else
+    print(self:create_help(maxwidth))
+  end
+  os.exit(0)
 end
 
 function Argparser:create_inline_help()
