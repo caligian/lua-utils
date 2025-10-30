@@ -42,21 +42,21 @@ function utils.assert_nargs(name, args, nargs)
   if types.number(nargs) then
     if nargs ~= passed then
       utils.print_and_exit(
-        '<keyword>%s: Expected %d, got %d arguments',
+        '<keyword>%s: Expected %d arguments, got %d',
         name, nargs, passed
       )
     end
   elseif nargs == "?" then
-    if passed ~= 0 or passed ~= 1 then
+    if passed > 1 then
       utils.print_and_exit(
-        '<keyword>%s: Expected 1 or 0 arguments, got %d arguments',
+        '<keyword>%s: Expected 1 or 0 argument, got %d',
         name, passed
       )
     end
   elseif nargs == "+" then
     if passed == 0 then
       utils.print_and_exit(
-        '<keyword>%s: Expected more than 1 argument, got %d arguments',
+        '<keyword>%s: Expected more than 1 argument, got %d',
         name, passed
       )
     end
