@@ -250,7 +250,7 @@ end
 ---@return string[]
 function Argparser:_parse(args, maxwidth)
   args = args or self.args or arg
-  local sep_pos = list.index(args, "--")
+  local sep_pos = list.index1(args, "--")
   local positional = {}
 
   if sep_pos then
