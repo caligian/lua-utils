@@ -86,9 +86,9 @@ end
 
 function ifnonnil(obj, if_nonnil, if_nil)
   if obj ~= nil then
-    return if_nonnil
+    return call_if_function(if_nonnil)
   else
-    return if_nil
+    return call_if_function(if_nil)
   end
 end
 
@@ -98,9 +98,9 @@ function ifnil(obj, if_nil, if_nonnil)
   end
 
   if obj == nil then
-    return if_nil
+    return call_if_function(if_nil)
   else
-    return if_nonnil
+    return call_if_function(if_nonnil)
   end
 end
 
