@@ -9,8 +9,10 @@ local placeholder = require 'lua-utils.template.placeholder'
 ---@class template
 ---@field string string
 ---@field placeholders? table<string,any>
+---@field utils table<string,function>
 ---@overload fun(s: string, placeholders?: table)
 local template = class 'template'
+template.utils = placeholder
 
 function template:initialize(s, placeholders)
   self.string = s
