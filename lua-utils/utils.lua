@@ -12,19 +12,27 @@ function dump(x)
   end
 end
 
+local function call_if_function(f)
+  if type(f) == 'function' then
+    return f()
+  else
+    return f
+  end
+end
+
 function ifelse(cond, when_true, when_false)
   if cond then
-    return when_true
+    return call_if_function(when_true)
   else
-    return when_false
+    return call_if_function(when_false)
   end
 end
 
 function unless(cond, when_false, when_true)
   if not cond then
-    return when_false
+    return call_if_function(when_false)
   else
-    return when_true
+    return call_if_function(when_true)
   end
 end
 
@@ -262,4 +270,8 @@ function writelines(lines, filename)
 
   fh:close()
   return size + #lines[l]
+end
+
+function errorf(msg, ...)
+  error(sprintf(msg, ...))
 end
