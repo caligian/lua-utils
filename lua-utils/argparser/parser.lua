@@ -261,6 +261,7 @@ end
 ---@return string[]
 function Argparser:_parse(args, maxwidth)
   args = args or self.args or arg
+  pp(args)
   local sep_pos = list.index1(args, "--")
   local positional = {}
 
@@ -339,28 +340,28 @@ function Argparser:parse(args, maxwidth)
   return self.parsed
 end
 
---
+
 -- local s =
 -- "1 2 3 4 --name 1 -a 2 --name 2 3 4 10 --b-name 4 5 6"
--- local parser = Argparser("Hello world", "Some longer description")
--- -- parser.args = string.split(s, " ")
---
--- parser:K('a', 'name', {
---   help = "please print something here or else i will die of not getting attention",
---   nargs = "*",
---   required = true,
---   duplicate = true,
--- })
---
--- parser:K('b', 'b-name', {
---   help = "please print something here or else i will die of not getting attention",
---   nargs = 1,
---   required = true,
---   post = tonumber,
---   duplicate = false
--- })
---
--- parser:P('X', {help = 'This is a variable'})
--- pp(parser:parse())
+local parser = Argparser("Hello world", "Some longer description")
+-- parser.args = string.split(s, " ")
+
+parser:K('a', 'name', {
+  help = "please print something here or else i will die of not getting attention",
+  nargs = "*",
+  required = true,
+  duplicate = true,
+})
+
+parser:K('b', 'b-name', {
+  help = "please print something here or else i will die of not getting attention",
+  nargs = 1,
+  required = true,
+  post = tonumber,
+  duplicate = false
+})
+
+parser:P('X', {help = 'This is a variable'})
+pp(parser:parse())
 
 return Argparser

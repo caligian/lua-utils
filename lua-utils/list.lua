@@ -67,7 +67,7 @@ function list.reverse(x)
   local res = {}
   local ind = 1
 
-  for i=#x, 1, -1 do
+  for i = #x, 1, -1 do
     res[ind] = x[i]
     ind = ind + 1
   end
@@ -76,11 +76,11 @@ function list.reverse(x)
 end
 
 ---Push elements at the end
----@param x table 
+---@param x table
 ---@param ... any
 ---@return table
 function list.push(x, ...)
-  for _, arg in ipairs({...}) do
+  for _, arg in ipairs({ ... }) do
     table.insert(x, arg)
   end
 
@@ -88,11 +88,11 @@ function list.push(x, ...)
 end
 
 ---Push elements at the start
----@param x table 
+---@param x table
 ---@param ... any
 ---@return table
 function list.unpush(x, ...)
-  for _, arg in ipairs(list.reverse({...})) do
+  for _, arg in ipairs(list.reverse({ ... })) do
     table.insert(x, 1, arg)
   end
 
@@ -100,11 +100,11 @@ function list.unpush(x, ...)
 end
 
 ---Push elements or extend table at the end
----@param x table 
+---@param x table
 ---@param ... any
 ---@return table
 function list.lextend(x, ...)
-  local lextend = function (a, b)
+  local lextend = function(a, b)
     if type(b) == 'table' then
       list.unpush(a, unpack(b))
     else
@@ -112,7 +112,7 @@ function list.lextend(x, ...)
     end
   end
 
-  for _, arg in ipairs({...}) do
+  for _, arg in ipairs({ ... }) do
     lextend(x, arg)
   end
 
@@ -120,13 +120,13 @@ function list.lextend(x, ...)
 end
 
 ---Push elements or extend table at the end
----@param x table 
+---@param x table
 ---@param ... any
 ---@return table
 function list.extend(x, ...)
-  for _, arg in ipairs({...}) do
+  for _, arg in ipairs({ ... }) do
     if type(arg) == 'table' then
-      for i=1, #arg do list.append(x, arg[i]) end
+      for i = 1, #arg do list.append(x, arg[i]) end
     else
       list.append(x, arg)
     end
@@ -135,17 +135,17 @@ function list.extend(x, ...)
   return x
 end
 
----Get sequence of elements. Similar to for i=<int>, i<j, <int> 
----@param start number 
+---Get sequence of elements. Similar to for i=<int>, i<j, <int>
+---@param start number
 ---@param end_ number
 ---@param by? number (default: 1)
 ---@return number[]
 function list.seq(start, end_, by)
-  by = by or 1
+  by        = by or 1
   local res = {}
-  local ind  = 1
+  local ind = 1
 
-  for i=start, end_, by do
+  for i = start, end_, by do
     res[ind] = i
     ind = ind + 1
   end
@@ -159,11 +159,11 @@ end
 ---@return table
 function list.as_list(x, force)
   if force then
-    return {x}
+    return { x }
   elseif type(x) == 'table' then
     return x
   else
-    return {x}
+    return { x }
   end
 end
 
@@ -172,7 +172,7 @@ end
 ---@return table
 function list.extract(x)
   local res = {}
-  for i=1, #x do res[i] = x[i] end
+  for i = 1, #x do res[i] = x[i] end
   return res
 end
 
@@ -184,14 +184,14 @@ function list.take(x, n)
   local res = {}
   local len = #x
   if n > len then return x end
-  for i=1, n do res[i] = x[i] end
+  for i = 1, n do res[i] = x[i] end
   return res
 end
 
 ---Filter list elements
 ---@param x table
----@param f function 
----@param pass_index? boolean 
+---@param f function
+---@param pass_index? boolean
 ---@param map? (fun(any): any)
 ---@return table
 function list.filter(x, f, pass_index, map)
@@ -230,7 +230,7 @@ end
 function list.map(x, f, pass_index)
   local res = {}
 
-  for i=1, #x do
+  for i = 1, #x do
     if pass_index then
       res[i] = f(i, x[i])
     else
@@ -290,8 +290,8 @@ function list.popn(x, times)
   local out = {}
   local ind = 1
 
-  for i = 0, times-1 do
-    out[ind] = table.remove(x, len-i)
+  for i = 0, times - 1 do
+    out[ind] = table.remove(x, len - i)
     ind = ind + 1
   end
 
@@ -307,7 +307,7 @@ function list.compare(x, y, res)
   res = res or {}
   local limit = math.min(#x, #y)
 
-  for i=1, limit do
+  for i = 1, limit do
     if type(x[i]) == 'table' and type(y[i]) == 'table' then
       res[i] = {}
       list.compare(x[i], y[i], res[i])
@@ -348,7 +348,7 @@ end
 function list.set(x, ks, value)
   local _x = x
 
-  for i=1, #ks-1 do
+  for i = 1, #ks - 1 do
     local k = ks[i]
     local v = x[k]
     if type(v) == 'table' then
@@ -367,7 +367,7 @@ end
 ---@param ks number[]
 ---@return boolean
 function list.has(x, ks)
-  for i=1, #ks-1 do
+  for i = 1, #ks - 1 do
     local k = ks[i]
     local v = x[k]
     if type(v) ~= 'table' then
@@ -386,7 +386,7 @@ end
 ---@param map? (fun(x: any): any) apply function to the retrieved element
 ---@return any?, table
 function list.get(x, ks, map)
-  for i=1, #ks-1 do
+  for i = 1, #ks - 1 do
     local k = ks[i]
     local v = x[k]
     if type(v) ~= 'table' then
@@ -426,11 +426,12 @@ function list.slice(x, i, j)
   j = j < 0 and len + j or j
 
   if i > j then
+    error(string.format('Start index (%d) is larger than End index (%d)', i, j))
     return
   end
 
   local ind = 1
-  for _i=i, j do
+  for _i = i, j do
     res[ind] = x[_i]
     ind = ind + 1
   end
@@ -453,9 +454,9 @@ end
 ---@param cmp? (fun(a: any, b: any): boolean)
 ---@return number | boolean
 function list.index1(x, value, cmp)
-  cmp = cmp or function (a, b) return a == b end
+  cmp = cmp or function(a, b) return a == b end
 
-  for i=1, #x do
+  for i = 1, #x do
     local x_value = x[i]
     if cmp(x_value, value) then
       return i
@@ -468,7 +469,7 @@ end
 ---@class list.index.opts
 ---@field times? number (default: 1)
 ---@field once? boolean (default: true)
----@field cmp? (fun(a: any, b: any): boolean) 
+---@field cmp? (fun(a: any, b: any): boolean)
 ---@field compare? (fun(a: any, b: any): boolean) alias for opts.cmp
 
 ---Find indices/index of the value
@@ -483,11 +484,11 @@ function list.index(x, value, opts)
   once = ifelse(times > 1, false, once)
   local res = {}
   local ind = 1
-  local cmp = opts.cmp or opts.compare or function (a, b)
+  local cmp = opts.cmp or opts.compare or function(a, b)
     return a == b
   end
 
-  for i=1, #x do
+  for i = 1, #x do
     local v = x[i]
     local ok = cmp(v, value)
 
@@ -516,12 +517,12 @@ end
 function list.flatten(x, res)
   res = res or {}
 
-  for i=1, #x do
+  for i = 1, #x do
     local v = x[i]
     if type(v) == 'table' then
       list.flatten(v, res)
     else
-      res[#res+1] = v
+      res[#res + 1] = v
     end
   end
 
@@ -533,7 +534,7 @@ end
 ---@param f (fun(number, any) | fun(any))
 ---@param pass_index? boolean
 function list.each(x, f, pass_index)
-  for i=1, #x do
+  for i = 1, #x do
     if pass_index then
       f(i, x[i])
     else
@@ -542,14 +543,14 @@ function list.each(x, f, pass_index)
   end
 end
 
----Zip two lists 
+---Zip two lists
 ---@param x table
 ---@param y table
 ---@param shortest? boolean (default: false) zip elements according to the longer list
 ---@param mkdefault? (fun(): any) (default: `function() return false end`) fill value to compute will zipping
 ---@return table
 function list.zip2(x, y, shortest, mkdefault)
-  mkdefault = mkdefault or function () return false end
+  mkdefault = mkdefault or function() return false end
   local res = {}
   local x_len = #x
   local y_len = #y
@@ -562,10 +563,10 @@ function list.zip2(x, y, shortest, mkdefault)
     len = math.max(x_len, y_len)
   end
 
-  for i=1, len do
+  for i = 1, len do
     local x_value = ifnil(x[i], mkdefault())
     local y_value = ifnil(y[i], mkdefault())
-    res[i] = {x_value, y_value}
+    res[i] = { x_value, y_value }
   end
 
   return res
@@ -573,8 +574,8 @@ end
 
 ---Filter list elements if condition does not match
 ---@param x table
----@param f (fun(any): boolean) 
----@param pass_index? boolean 
+---@param f (fun(any): boolean)
+---@param pass_index? boolean
 ---@param map? (fun(any): any)
 ---@return table
 function list.filter_unless(x, f, pass_index, map)
@@ -609,7 +610,7 @@ end
 ---Return all elements but the last one
 ---@param t table
 ---@param n? number (default: 1) elements returned are #t - 1 in number
----@return table 
+---@return table
 function list.butlast(t, n)
   n = n or 1
   local len = #t
@@ -791,7 +792,7 @@ end
 ---@param f fun(x: any): any
 ---@return boolean
 function list.all(t, f)
-  f = f or function (x)
+  f = f or function(x)
     return x
   end
 
@@ -894,7 +895,7 @@ function list.bsearch(x, value, f)
     end
   end
 
-  f = f or function (a, b)
+  f = f or function(a, b)
     if a == b then
       return 0
     elseif a > b then
@@ -908,12 +909,12 @@ function list.bsearch(x, value, f)
 end
 
 local function join_tables(x, y, force, visited)
-  visited = visited or setmetatable({}, {__mode = 'k'})
-  local cache = function (a, b)
+  visited = visited or setmetatable({}, { __mode = 'k' })
+  local cache = function(a, b)
     visited[a] = visited[a] or {}
     visited[a][b] = true
   end
-  local exists = function (a, b)
+  local exists = function(a, b)
     local ok = visited[a]
     if ok then return ok[b] end
   end
@@ -963,7 +964,7 @@ end
 ---@param visited? table Cache table to prevent unnecessary recursion
 ---@return table
 function list.fix(x, fillvalue, depth, visited)
-  visited = visited or setmetatable({}, {__mode = 'k'})
+  visited = visited or setmetatable({}, { __mode = 'k' })
   local ks = {}
   local i = 1
   fillvalue = fillvalue or function() return false end
@@ -982,15 +983,15 @@ function list.fix(x, fillvalue, depth, visited)
     end
   end
 
-  ks = list.filter(ks, function (k) return type(k) == 'number' end)
+  ks = list.filter(ks, function(k) return type(k) == 'number' end)
   local min = math.min(unpack(ks))
   local max = math.max(unpack(ks))
 
-  for _i=1, min-1 do
+  for _i = 1, min - 1 do
     if not x[_i] then x[_i] = fillvalue() end
   end
 
-  for _i=min+1, max-1 do
+  for _i = min + 1, max - 1 do
     if not x[_i] then x[_i] = fillvalue() end
   end
 
@@ -1054,7 +1055,7 @@ function list:__call(...)
   local args = tuple.pack(...)
   local function call(elem)
     if type(elem) == 'table' then
-      for i=1, #elem do
+      for i = 1, #elem do
         local x = elem[i]
         if type(x) == 'table' then
           call(x)
@@ -1069,7 +1070,7 @@ function list:__call(...)
     end
   end
 
-  for i=1, #args do call(args[i]) end
+  for i = 1, #args do call(args[i]) end
   return res
 end
 
@@ -1079,7 +1080,7 @@ end
 ---@return boolean
 function list.subset_of(x, y)
   local y_ = {}
-  for i=1, #y do
+  for i = 1, #y do
     y_[y[i]] = true
   end
 
@@ -1098,7 +1099,7 @@ end
 ---@return boolean
 function list.superset_of(x, y)
   local x_ = {}
-  for i=1, #x do
+  for i = 1, #x do
     x_[x[i]] = true
   end
 
@@ -1120,13 +1121,13 @@ function list.difference(x, y)
   local ind = 0
   local y_ = {}
 
-  for i=1, #y do
+  for i = 1, #y do
     y_[y[i]] = true
   end
 
-  for i=1, #x do
+  for i = 1, #x do
     if not y_[x[i]] then
-      res[ind+1] = x[i]
+      res[ind + 1] = x[i]
       ind = ind + 1
     end
   end
@@ -1146,14 +1147,14 @@ function list.intersection(x, y)
   for _, value in pairs(x) do
     if y[value] then
       cache[value] = true
-      res[ind+1] = value
+      res[ind + 1] = value
       ind = ind + 1
     end
   end
 
   for _, value in pairs(y) do
     if x[value] and not cache[value] then
-      res[ind+1] = value
+      res[ind + 1] = value
       ind = ind + 1
     end
   end
@@ -1170,19 +1171,19 @@ function list.union(x, y)
   local res = {}
   local ind = 0
 
-  for i=1, #x do
+  for i = 1, #x do
     local v = x[i]
     if not cache[v] then
-      res[ind+1] = v
+      res[ind + 1] = v
       cache[v] = true
       ind = ind + 1
     end
   end
 
-  for i=1, #y do
+  for i = 1, #y do
     local v = y[i]
     if not cache[v] then
-      res[ind+1] = v
+      res[ind + 1] = v
       cache[v] = true
       ind = ind + 1
     end
@@ -1196,12 +1197,12 @@ end
 ---@param default? (fun(value: any): any) By default maps every element to true
 ---@return table
 function list.as_dict(x, default)
-  default = default or function (_)
+  default = default or function(_)
     return true
   end
 
   local res = {}
-  for i=1, #x do
+  for i = 1, #x do
     res[x[i]] = default(x[i])
   end
 
@@ -1226,7 +1227,7 @@ function list.pick(x, bool_x, invert)
   local res = {}
   local res_i = 1
 
-  for i=1, len_x do
+  for i = 1, len_x do
     local ok = bool_x[i]
     ok = ifelse(invert, not ok, ok)
     if ok then
@@ -1244,7 +1245,7 @@ end
 function list.test(x, f)
   local res = {}
 
-  for i=1, #x do
+  for i = 1, #x do
     local v = x[i]
     res[i] = ifelse(f(v), true, false)
   end
