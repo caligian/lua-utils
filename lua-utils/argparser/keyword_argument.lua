@@ -61,7 +61,7 @@ function KeywordArgument:initialize(short_name, long_name, specs)
   specs.metavar = specs.metavar or specs.name:upper()
   specs.nargs = specs.nargs or 0
   specs.times_passed = 0
-  specs.args = {}
+  specs.args = specs.args or {}
 
   dict.merge(self, specs, true)
 end
@@ -107,10 +107,10 @@ function KeywordArgument:create_inline_help(header)
   if header then
     local show
 
-    if name == short then
-      name = '-' .. name
-    else
-      name = '--' .. name
+    if short then
+      name = '-' .. short
+    elseif long then
+      name = '--' .. long
     end
 
     if not self.required then
@@ -162,13 +162,5 @@ function KeywordArgument:create_help(maxwidth)
     )
   end
 end
-
--- local arg = KeywordArgument('h', 'help', {
---   nargs = '*',
---   metavar = 'ABOUT_WHAT?',
---   help = 'This is a long ass description that will definitely fuck up the auto-fill-mode'
--- })
--- print(arg:create_help())
---
 
 return KeywordArgument

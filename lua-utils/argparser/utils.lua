@@ -83,7 +83,7 @@ end
 
 function utils.create_help(header, help, maxwidth)
   maxwidth = maxwidth or utils.get_term_width(72)
-  local midpoint = math.ceil(maxwidth / 2)
+  local midpoint = math.ceil(maxwidth / 2) - 3
   midpoint = ifelse(midpoint < 20, 20, midpoint)
   local header_len = #header
   help = string.split(help, "%s+")
@@ -95,7 +95,7 @@ function utils.create_help(header, help, maxwidth)
     final[#final+1] = x
   end
   local push_blank = function (how_much)
-    how_much = how_much or midpoint - 3
+    how_much = how_much or midpoint
     push(string.rep(" ", how_much + 1))
   end
 
@@ -105,7 +105,7 @@ function utils.create_help(header, help, maxwidth)
     push_blank()
   else
     push(header)
-    local dist = midpoint - #header - 3
+    local dist = midpoint - #header
     push_blank(dist)
   end
 

@@ -51,7 +51,7 @@ end
 
 function Argparser:add_keyword_argument(short_name, long_name, spec)
   local kw = KeywordArgument(short_name, long_name, spec)
-  self.keyword_arguments[kw.name] = kw 
+  self.keyword_arguments[kw.name] = kw
   return kw
 end
 
@@ -60,7 +60,7 @@ Argparser.K = Argparser.add_keyword_argument
 function Argparser:add_positional_argument(name, spec)
   local pos = PositionalArgument(name, spec)
   self.positional_arguments[pos.name] = pos
-  self.positional_arguments[#self.positional_arguments+1] = pos
+  self.positional_arguments[#self.positional_arguments + 1] = pos
   pos.index = #self.positional_arguments
 
   return pos
@@ -109,13 +109,15 @@ function Argparser:_find_keyword_arguments(args, maxwidth)
 
     list.each(all, function(ind)
       list.append(withindex, {
-        pos = ind, name = name,
-        spec = specs, args = {}
+        pos = ind,
+        name = name,
+        spec = specs,
+        args = {}
       })
     end)
   end)
 
-  dict.each(self.keyword_arguments, function (name, specs)
+  dict.each(self.keyword_arguments, function(name, specs)
     if specs.times_passed == 0 and specs.required then
       utils.print_and_exit('<keyword>%s: Required but not passed', name)
     end
@@ -165,10 +167,10 @@ function Argparser:_find_keyword_arguments(args, maxwidth)
   return withindex
 end
 
----@return KeywordArgument[] 
+---@return KeywordArgument[]
 function Argparser:keyword_arguments_list()
   local names = list.sort(dict.keys(self.keyword_arguments))
-  return list.map(names, function (name)
+  return list.map(names, function(name)
     return self.keyword_arguments[name]
   end)
 end
@@ -190,10 +192,10 @@ function Argparser:create_inline_help()
   local final = { 'Usage:', self.filename }
   list.extend(
     final,
-    list.map(self.positional_arguments, function (pos)
+    list.map(self.positional_arguments, function(pos)
       return pos:create_inline_help()
     end),
-    list.map(self:keyword_arguments_list(), function (kw)
+    list.map(self:keyword_arguments_list(), function(kw)
       return kw:create_inline_help(true)
     end)
   )
@@ -206,19 +208,19 @@ function Argparser:create_help(maxwidth)
   local final = { header, self.description }
 
   if #self.positional_arguments > 0 then
-    final[#final+1] = ''
-    final[#final+1] = "Positional arguments:"
+    final[#final + 1] = ''
+    final[#final + 1] = "Positional arguments:"
   end
 
   list.extend(final, list.map(
     self.positional_arguments,
-    function (pos)
+    function(pos)
       return pos:create_help(maxwidth)
     end
   ))
 
   if #final > 2 then
-    final[#final+1] = ""
+    final[#final + 1] = ""
   end
 
   local kws = self:keyword_arguments_list()
@@ -226,7 +228,7 @@ function Argparser:create_help(maxwidth)
     final[#final + 1] = "Keyword arguments:"
   end
 
-  list.extend(final, list.map(kws, function (kw)
+  list.extend(final, list.map(kws, function(kw)
     return kw:create_help(maxwidth)
   end))
 
@@ -261,7 +263,6 @@ end
 ---@return string[]
 function Argparser:_parse(args, maxwidth)
   args = args or self.args or arg
-  pp(args)
   local sep_pos = list.index1(args, "--")
   local positional = {}
 
@@ -318,10 +319,12 @@ function Argparser:parse(args, maxwidth)
     name = name:gsub('-', '_')
     if kw.times_passed > 0 then
       kwargs[name] = kw.args
+    elseif kw.default then
+      kwargs[name] = totable(kw.default())
     end
   end
 
-  for i=1, #self.positional_arguments do
+  for i = 1, #self.positional_arguments do
     local x = self.positional_arguments[i]
     local name = x.name
 
@@ -339,29 +342,5 @@ function Argparser:parse(args, maxwidth)
 
   return self.parsed
 end
-
-
--- local s =
--- "1 2 3 4 --name 1 -a 2 --name 2 3 4 10 --b-name 4 5 6"
-local parser = Argparser("Hello world", "Some longer description")
--- parser.args = string.split(s, " ")
-
-parser:K('a', 'name', {
-  help = "please print something here or else i will die of not getting attention",
-  nargs = "*",
-  required = true,
-  duplicate = true,
-})
-
-parser:K('b', 'b-name', {
-  help = "please print something here or else i will die of not getting attention",
-  nargs = 1,
-  required = true,
-  post = tonumber,
-  duplicate = false
-})
-
-parser:P('X', {help = 'This is a variable'})
-pp(parser:parse())
 
 return Argparser

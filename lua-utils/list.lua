@@ -417,7 +417,7 @@ end
 ---@param x table
 ---@param i number
 ---@param j? number (default: #x)
----@return table?
+---@return table
 function list.slice(x, i, j)
   local res = {}
   local len = #x
@@ -426,8 +426,7 @@ function list.slice(x, i, j)
   j = j < 0 and len + j or j
 
   if i > j then
-    error(string.format('Start index (%d) is larger than End index (%d)', i, j))
-    return
+    return {}
   end
 
   local ind = 1

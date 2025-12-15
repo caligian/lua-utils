@@ -372,17 +372,23 @@ local function join_tables(x, y, force, visited)
   for key, value in pairs(y) do
     local x_value = x[key]
     local y_value = value
+    local x_type = type(x_value)
+    local y_type = type(y_value)
+    local x_is_table = x_type == 'table'
+    local y_is_table = y_type == 'table'
 
     if x_value == nil then
       x[key] = y_value
-    elseif type(y_value) == 'table' then
-      if type(x_value) == 'table' and not exists(y_value, x_value) then
+    elseif y_is_table then
+      if force then
+        x[key] = y_value
+      elseif x_is_table and not exists(y_value, x_value) then
         cache(y_value, x_value)
         join_tables(x_value, y_value, force, visited)
-      elseif force then
-        x[key] = y_value
       end
-    else
+    elseif force then
+      x[key] = y_value
+    elseif x_value == nil then
       x[key] = y_value
     end
   end
