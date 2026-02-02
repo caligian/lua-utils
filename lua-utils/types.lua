@@ -2,14 +2,23 @@ require 'lua-utils.utils'
 local list = require('lua-utils.list')
 local dict = require('lua-utils.dict')
 local class = require('lua-utils.class')
+local err = require 'lua-utils.error'
 local types = {}
+
 types.object = class.is_object
 types.instance = class.is_instance
 types.class = class.is_class
+types.error = err.is_error
+types.error_instance = err.is_error_instance
+types.error_class = err.is_error_class
+types.result = err.is_result
+types.failure = err.is_failure
+types.success = err.is_success
+types.unwrap_error = err.is_unwrap_error
 
 ---Is value thread
 ---@param x any
----@return boolean, string? 
+---@return boolean, string?
 function types.thread(x)
   if x == nil then
     return false, 'expected thread, got nothing'
@@ -23,7 +32,7 @@ end
 
 ---Is value userdata
 ---@param x any
----@return boolean, string? 
+---@return boolean, string?
 function types.userdata(x)
   if x == nil then
     return false, 'expected userdata, got nothing'
@@ -37,7 +46,7 @@ end
 
 ---Is value a function
 ---@param x any
----@return boolean, string? 
+---@return boolean, string?
 function types.fun(x)
   if x == nil then
     return false, 'expected function, got nothing'
@@ -53,7 +62,7 @@ types['function'] = types.fun
 
 ---Is value a number
 ---@param x any
----@return boolean, string? 
+---@return boolean, string?
 function types.number(x)
   if x == nil then
     return false, 'expected number, got nothing'
@@ -67,7 +76,7 @@ end
 
 ---Is value a table
 ---@param x any
----@return boolean, string? 
+---@return boolean, string?
 function types.table(x)
   if x == nil then
     return false, 'expected table, got nothing'
@@ -81,7 +90,7 @@ end
 
 ---Is value a string?
 ---@param x any
----@return boolean, string? 
+---@return boolean, string?
 function types.string(x)
   if x == nil then
     return false, 'expected string, got nothing'
@@ -95,7 +104,7 @@ end
 
 ---Is value a boolean
 ---@param x any
----@return boolean, string? 
+---@return boolean, string?
 function types.boolean(x)
   if x == nil then
     return false, 'expected boolean, got nothing'
@@ -109,7 +118,7 @@ end
 
 ---Is value a list
 ---@param x any
----@return boolean, string? 
+---@return boolean, string?
 function types.list(x)
   local ok, msg = types.table(x)
   if not ok then
@@ -123,7 +132,7 @@ end
 
 ---Is value a dict (non-contiguously indexed table)
 ---@param x any
----@return boolean, string? 
+---@return boolean, string?
 function types.dict(x)
   local ok, msg = types.table(x)
   if not ok then
@@ -137,7 +146,7 @@ end
 
 ---Is value a callable (function or table with .call metamethod)
 ---@param x any
----@return boolean, string? 
+---@return boolean, string?
 function types.callable(x)
   if x == nil then
     return false, 'expected function|callable, got nothing'
@@ -159,7 +168,7 @@ end
 
 ---Does value (a table) have a metatable
 ---@param x any
----@return boolean, string? 
+---@return boolean, string?
 function types.hasmetatable(x)
   local ok, msg = types.table(x)
   if not ok then return false, msg end
@@ -170,10 +179,9 @@ function types.hasmetatable(x)
   return true
 end
 
-
 ---Is value a table without metatable?
 ---@param x any
----@return boolean, string? 
+---@return boolean, string?
 function types.pure_table(x)
   if x == nil then
     return false, 'expected table, got nothing'
@@ -191,7 +199,7 @@ end
 
 ---Is value a pure dict? (without a metatable)
 ---@param x any
----@return boolean, string? 
+---@return boolean, string?
 function types.pure_dict(x)
   if x == nil then
     return false, 'expected dict, got nothing'
@@ -209,7 +217,7 @@ end
 
 ---Is value a pure list (without metatable)
 ---@param x any
----@return boolean, string? 
+---@return boolean, string?
 function types.pure_list(x)
   if x == nil then
     return false, 'expected list, got nothing'
@@ -228,7 +236,7 @@ end
 ---Does table x include table y? (are y's keys present in x?)
 ---@param x table
 ---@param y table
----@return boolean, string? 
+---@return boolean, string?
 function types.includes(x, y)
   for key, _ in pairs(y) do
     if x[key] == nil then
@@ -251,9 +259,13 @@ end
 ---Valid types in ascending order of priority:
 ---  class, instance, pure_list, pure_dict, list, dict, function, callable, type(x)
 ---@param x any
----@return string 
+---@return string
 function types.type(x)
-  if types.class(x) then
+  if types.multimethod(x) then
+    return 'multimethod'
+  elseif types.error(x) then
+    return 'error'
+  elseif types.class(x) then
     return 'class'
   elseif types.instance(x) then
     return 'instance'
@@ -279,7 +291,7 @@ end
 ---> pure_list > pure_dict > (class >= instance >= object) > callable > list > dict > type(child)
 ---@param child any
 ---@param parent any
----@return boolean, string? 
+---@return boolean, string?
 function types.is(child, parent)
   if child == nil and parent == nil then
     return true
@@ -290,8 +302,8 @@ function types.is(child, parent)
       return types.pure_dict(child)
     elseif parent == 'multimethod' then
       return types.multimethod(child)
-    elseif parent == 'exception' then
-      return types.exception(child)
+    elseif parent == 'error' then
+      return types.error(child)
     elseif parent == 'class' then
       return types.class(child)
     elseif parent == 'instance' then
@@ -319,8 +331,8 @@ function types.is(child, parent)
     else
       return class.isa(child, parent)
     end
-  elseif types.exception(parent) then
-    local ok, msg = types.exception(child)
+  elseif types.error(parent) then
+    local ok, msg = types.error(child)
     if not ok then
       return false, msg
     else
@@ -386,8 +398,8 @@ end
 ---@param ... any
 ---@return fun(x: any): boolean, string?
 function types.union(...)
-  local signature = {...}
-  return function (x)
+  local signature = { ... }
+  return function(x)
     local ok, msg
     local msgs = {}
 
@@ -412,7 +424,7 @@ end
 function types.is_union_of(x, ...)
   local ok, msg
   local msgs = {}
-  local signature = {...}
+  local signature = { ... }
 
   for _, sig in ipairs(signature) do
     ok, msg = types.is(x, sig)
@@ -443,13 +455,13 @@ types.is_opt = types.is_optional
 types.opt = types.optional
 
 function types.list_of(what)
-  return function (x, assert_)
+  return function(x, assert_)
     return types.is_list_of(x, what, assert_)
   end
 end
 
 function types.dict_of(what)
-  return function (x, assert_)
+  return function(x, assert_)
     return types.is_dict_of(x, what, assert_)
   end
 end
@@ -458,7 +470,7 @@ function types.is_list_of(x, what, assert_)
   local ok, msg = types.list(x)
   if not ok then return false, msg end
 
-  for i=1, #x do
+  for i = 1, #x do
     ok, msg = types.is(x[i], what)
     if not ok then
       msg = msg or sprintf('type mismatch (%s)', x)
@@ -491,7 +503,7 @@ function types.is_dict_of(x, what, assert_)
 end
 
 function types.table_of(key_f, value_f)
-  return function (x, assert_)
+  return function(x, assert_)
     return types.is_table_of(x, key_f, value_f, assert_)
   end
 end
@@ -527,7 +539,7 @@ function types.is_table_of(x, key_f, value_f, assert_)
   return true
 end
 
----Type assertion 
+---Type assertion
 ---usage:
 ---> types.assert.<prefix>(<value>, <condition (boolean)>)
 ---> types.assert(<value>, <condition>, <name>)
@@ -555,7 +567,7 @@ function types.assert:__call(x, cond, name)
     msg = msg or ''
     if name then
       error(name .. ': ' .. msg)
-  else
+    else
       error(msg)
     end
   else
@@ -564,7 +576,7 @@ function types.assert:__call(x, cond, name)
 end
 
 function types.assert:__index(name)
-  return function (x, cond)
+  return function(x, cond)
     return types.assert(x, cond, name)
   end
 end
@@ -594,7 +606,7 @@ function types.assert.some(elems)
   local ks = dict.keys(elems)
   local n = #ks
 
-  for i=1, n do
+  for i = 1, n do
     local k = ks[i]
     local x = elems[k]
 
@@ -631,7 +643,7 @@ function types.multimethod(x)
   end
 end
 
-function types.exception(x)
+function types.error(x)
   local ok, msg = types.t(x)
   if not ok then
     return false, msg
@@ -647,9 +659,9 @@ function types.exception(x)
     return false, msg
   end
 
-  ok = x.type == 'exception'
+  ok = x.type == 'error'
   if not ok then
-    return false, sprintf('expected exception, got %s', x)
+    return false, sprintf('expected error, got %s', x)
   end
 
   return true
@@ -676,6 +688,6 @@ types.pd = types.pure_dict
 types.l = types.list
 types.d = types.dict
 types.m = types.multimethod
-types.e = types.exception
+types.e = types.error
 
 return types
