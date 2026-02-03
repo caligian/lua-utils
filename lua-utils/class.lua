@@ -98,7 +98,7 @@ end
 ---@param obj object
 ---@return boolean
 function class.is_parent_of(cls, obj)
-  return class.inherits(cls, obj)
+  return class.inherits(obj, cls)
 end
 
 ---Is class child of obj?
@@ -291,6 +291,7 @@ function class.create_instance(cls, defaults, ...)
     __methods = cls.__attributes,
   }
   setmetatable(obj, obj)
+
   obj.__newindex = class.set
   obj.__object = true
   obj.__name = cls.__name
@@ -309,6 +310,10 @@ function class.create_instance(cls, defaults, ...)
     cls.initialize(obj, ...)
   else
     class.super(obj, ...)
+  end
+
+  function cls.is(obj_)
+    return cls:isa(obj_)
   end
 
   return obj
@@ -344,8 +349,19 @@ function class.get_parents(obj)
 end
 
 function class:__call(name, inherits, defaults)
-  if inherits and inherits.__instance then
-    inherits = inherits.__class
+  assert(type(name) == 'string', 'name: Expected string, got ' .. dump(name))
+  if inherits then
+    local ok, msg = class.is_object(inherits)
+    if not ok then
+      msg = 'inherits: ' .. msg
+      error(msg)
+    else
+      inherits = class.get_class(inherits)
+    end
+  end
+
+  if defaults then
+    assert(type(defaults), 'defaults: Expected a table, got ' .. dump(defaults))
   end
 
   local cls = {
@@ -395,11 +411,28 @@ function class:__call(name, inherits, defaults)
   end
 
   setmetatable(cls, cls)
+
+  cls.inherits = class.inherits
+  cls.isa = cls.inherits
+  cls.is_parent_of = class.is_parent_of
+  cls.is_child_of = class.is_child_of
+  cls.get_methods = class.methods
+  cls.get_attributes = class.attributes
+  cls.get_parents = class.get_parents
+
+  function cls.is(obj)
+    return cls:isa(obj)
+  end
+
   return cls
 end
 
 class.class = class.get_class
 class.isa = class.inherits
 class.parents = class.get_parents
+
+function class:import()
+  _G.class = self
+end
 
 return class

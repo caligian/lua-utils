@@ -690,4 +690,8 @@ types.d = types.dict
 types.m = types.multimethod
 types.e = types.error
 
+function types:import()
+  _G.types = self
+end
+
 return types

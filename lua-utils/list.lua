@@ -1259,4 +1259,8 @@ list.nthcdr = list.rest
 list.append = list.push
 list.size = list.length
 
+function list:import()
+  _G.list = self
+end
+
 return list

@@ -560,4 +560,8 @@ function dict.extract(x)
   return res
 end
 
+function dict:import()
+  _G.dict = self
+end
+
 return dict
