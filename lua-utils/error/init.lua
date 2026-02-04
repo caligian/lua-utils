@@ -251,13 +251,4 @@ function err:import()
   _G.err = self
 end
 
-local ok = Success(1)
-local failure = Failure(err('SomeError', err('AnotherError'))())
-
-err.unwrap(failure, {tbl = false})
-
-
-
-
-
 return err

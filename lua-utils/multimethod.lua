@@ -1,34 +1,39 @@
 require 'lua-utils.utils'
-local copy = require 'lua-utils.copy'
-local list = require 'lua-utils.list'
 local tuple = require 'lua-utils.tuple'
 local types = require 'lua-utils.types'
+local class = require 'lua-utils.class'
 
-local multimethod = {}
-setmetatable(multimethod, multimethod)
+---@class Multimethod
+---@field name string
+---@field methods table<any[], function>
+---@field default fun(...): any
+local Multimethod
 
-function multimethod.is_multimethod(x)
-  local ok, msg = types.table(x)
+---@overload fun(name: string, default?: function): Multimethod
+Multimethod = class 'Multimethod'
+
+---Is object a multimethod
+---@param x any
+---@return boolean, string?
+function Multimethod.is(x)
+  local ok, msg = class.is_object(x)
   if not ok then
     return false, msg
   end
 
-  ok, msg = types.hasmetatable(x)
-  if not ok then
-    return false, msg
+  local parents = class.get_parents(x)
+  for i = 1, #parents do
+    if parents[i] == 'Multimethod' then
+      return true
+    end
   end
 
-  local mt = getmetatable(x)
-  if mt ~= x then
-    return false, sprintf('expected multimethod, got %s', x)
-  elseif not (x.name and x.methods and x.__call) then
-    return false, sprintf('expected multimethod, got %s', x)
-  else
-    return types.callable(x.__call)
-  end
+  return false, 'Expected Multimethod, got ' .. x.__name
 end
 
-function multimethod.match(mm, ...)
+function Multimethod:match(...)
+  local methods = self.methods
+  local default = self.default
   local values = tuple.pack(...)
   local n = #values
   local sig_matches = function(sig)
@@ -37,7 +42,7 @@ function multimethod.match(mm, ...)
       return false
     end
 
-    for i=1, m do
+    for i = 1, m do
       local x = values[i]
       if not types.is(x, sig[i]) then
         return false
@@ -47,46 +52,56 @@ function multimethod.match(mm, ...)
     return true
   end
 
-  for sig, fn in pairs(mm.methods) do
+  for sig, fn in pairs(methods) do
     if type(sig) == 'table' and sig_matches(sig) then
       return fn
     end
   end
 
-  if not mm.default then
-    error(sprintf('No default method defined in %s', mm))
+  if not default then
+    error(sprintf('No default method defined in %s', self))
   end
 
-  return mm.default
+  return default
 end
 
-function multimethod.define(name)
-  local fun = {name = name, methods = {}}
-  setmetatable(fun, fun)
-
-  function fun:__call(...)
-    return multimethod.match(self, ...)(...)
+---Add function signature
+---@param sig any[]
+---@param method? function
+---@return function
+function Multimethod:on(sig, method)
+  if not types.pure_list(sig) then
+    sig = {sig}
   end
 
-  function fun.define(sig, method)
-    fun[sig] = method
+  method = method or function(_method)
+    self.methods[sig] = _method
+    return method
   end
 
-  function fun.odefine(sig, method)
-    sig = copy.copy(sig)
-    sig = list.unpush(sig, 'table')
-    fun[sig] = method
-  end
-
-  fun.def = fun.define
-  fun.odef = fun.odefine
-  fun.__index = fun.methods
-
-  return fun
+  return method
 end
 
-function multimethod:__call(name)
-  return multimethod.define(name)
+function Multimethod:initialize(name, default)
+  self.methods = {}
+  self.default = default or function (...)
+    error('No method matched')
+    return ...
+  end
+  self.name = name
+
+  function self:__call(...)
+    local fn = self:match(...)
+    return fn(...)
+  end
 end
 
-return multimethod
+function Multimethod:import()
+  if types.instance(self) then
+    _G.Multimethod = self.__class
+  else
+    _G.Multimethod = self
+  end
+end
+
+return Multimethod

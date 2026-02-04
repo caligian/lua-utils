@@ -261,14 +261,8 @@ end
 ---@param x any
 ---@return string
 function types.type(x)
-  if types.multimethod(x) then
-    return 'multimethod'
-  elseif types.error(x) then
-    return 'error'
-  elseif types.class(x) then
-    return 'class'
-  elseif types.instance(x) then
-    return 'instance'
+  if class.is_object(x) then
+    return x.__name
   elseif types.pure_list(x) then
     return 'pure_list'
   elseif types.pure_dict(x) then
@@ -295,71 +289,23 @@ end
 function types.is(child, parent)
   if child == nil and parent == nil then
     return true
-  elseif types.string(parent) then
-    if parent == 'pure_list' then
-      return types.pure_list(child)
-    elseif parent == 'pure_dict' then
-      return types.pure_dict(child)
-    elseif parent == 'multimethod' then
-      return types.multimethod(child)
-    elseif parent == 'error' then
-      return types.error(child)
-    elseif parent == 'class' then
-      return types.class(child)
-    elseif parent == 'instance' then
-      return types.instance(child)
-    elseif parent == 'object' then
-      return types.object(child)
-    elseif parent == 'callable' then
-      return types.callable(child)
-    elseif parent == 'list' then
-      return types.list(child)
-    elseif parent == 'dict' then
-      return types.dict(child)
-    else
-      local ok = type(child) == parent
-      if not ok then
-        return false, sprintf('expected %s, got %s', parent, child)
-      else
-        return true
-      end
-    end
-  elseif types.object(parent) then
-    local ok, msg = types.object(child)
-    if not ok then
-      return false, msg
-    else
-      return class.isa(child, parent)
-    end
-  elseif types.error(parent) then
-    local ok, msg = types.error(child)
-    if not ok then
-      return false, msg
-    else
-      return child:inherits(parent)
-    end
-  elseif types.callable(parent) then
-    return parent(child)
-  elseif types.table(parent) then
-    local ok, msg = types.table(child)
-    if not ok then
-      return false, msg
-    else
-      return types.includes(child, parent)
-    end
+  elseif child == parent then
+    return true
+  end
+
+  local child_type = types.type(child)
+  local parent_type = types.type(parent)
+  local child_is_obj = child_type:match('^[A-Z]')
+  local parent_is_obj = parent_type:match('^[A-Z]')
+
+  if child_is_obj and parent_is_obj then
+    return child:isa(parent)
+  elseif child_type == parent_type then
+    return true
+  elseif child_type == parent then
+    return true
   else
-    local parent_type = types.type(parent)
-    local child_type = types.type(child)
-    if parent_type ~= child_type then
-      return false, sprintf(
-        'expected %s, got (%s) %s',
-        parent_type,
-        child_type,
-        child
-      )
-    else
-      return true
-    end
+    return false, sprintf('Expected %s, got %s', child_type, parent_type)
   end
 end
 
@@ -550,13 +496,14 @@ end
 ---@param name? string
 function types.assert(x, cond, name)
   --- Stub method
-  print(x, cond, name)
 end
 
 types.assert = {}
 setmetatable(types.assert, types.assert)
 
 function types.assert:__call(x, cond, name)
+  pp {x, cond, name}
+
   if name then
     local ok, msg = types.string(name)
     if not ok then error(sprintf('%s: %s', name, msg)) end
@@ -623,72 +570,27 @@ function types.assert.some(elems)
 end
 
 function types.multimethod(x)
-  local ok, msg = types.table(x)
+  local ok, msg = types.object(x)
   if not ok then
     return false, msg
   end
 
-  ok, msg = types.hasmetatable(x)
-  if not ok then
-    return false, msg
+  if x.__name == 'Multimethod' then
+    return true
   end
 
-  local mt = getmetatable(x)
-  if mt ~= x then
-    return false, sprintf('expected multimethod, got %s', x)
-  elseif not (x.name and x.methods and x.__call) then
-    return false, sprintf('expected multimethod, got %s', x)
-  else
-    return types.callable(x.__call)
-  end
-end
-
-function types.error(x)
-  local ok, msg = types.t(x)
-  if not ok then
-    return false, msg
+  local parents = class.parents(x)
+  for i=1, #parents do
+    if parents[i] == 'Multimethod' then
+      return true
+    end
   end
 
-  ok, msg = types.hasmetatable(x)
-  if not ok then
-    return false, msg
-  end
-
-  ok, msg = types.c(x)
-  if not ok then
-    return false, msg
-  end
-
-  ok = x.type == 'error'
-  if not ok then
-    return false, sprintf('expected error, got %s', x)
-  end
-
-  return true
+  return false, 'Expected Multimethod object, got ' .. dump(x)
 end
 
 types.has_metatable = types.hasmetatable
-types.hasmt = types.hasmetatable
-types.U = types.union
-types.O = types.optional
-types.n = types.number
-types.t = types.table
-types.th = types.thread
-types.s = types.string
-types.b = types.boolean
-types.u = types.userdata
-types.f = types.fun
-types.c = types.callable
-types.o = types.object
-types.cls = types.class
-types.i = types.instance
-types.pt = types.pure_table
-types.pl = types.pure_list
-types.pd = types.pure_dict
-types.l = types.list
-types.d = types.dict
-types.m = types.multimethod
-types.e = types.error
+types.metatable = types.has_metatable
 
 function types:import()
   _G.types = self

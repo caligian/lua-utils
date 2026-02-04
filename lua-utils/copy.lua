@@ -60,4 +60,8 @@ function copy:__call(x, deep)
   end
 end
 
+function copy:import()
+  _G.copy = self
+end
+
 return copy

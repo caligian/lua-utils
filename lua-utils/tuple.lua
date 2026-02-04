@@ -55,4 +55,8 @@ function tuple.slice(i, j, ...)
   return args
 end
 
+function tuple:import()
+  _G.tuple = tuple
+end
+
 return tuple

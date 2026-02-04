@@ -161,4 +161,9 @@ function string.title(x)
   return table.concat(words, " ")
 end
 
+function string.contains(s, pattern, init, plain)
+  plain = (plain == nil and true) or plain
+  return string.find(s, pattern, init, true)
+end
+
 return string

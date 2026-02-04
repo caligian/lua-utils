@@ -13,20 +13,23 @@ local M = {
 	copy = require 'lua-utils.copy',
 	validate = require 'lua-utils.validate',
 	cmp = require 'lua-utils.cmp',
-	multimethod = require 'lua-utils.multimethod',
-	template = require 'lua-utils.template',
+	Multimethod = require 'lua-utils.multimethod',
+	Template = require 'lua-utils.template',
 	err = require 'lua-utils.error',
-	argparser = require 'lua-utils.argparser',
+	ArgumentParser = require 'lua-utils.argparser',
 	path = require 'lua-utils.path_utils',
 	process = require 'lua-utils.process',
 }
 
 function M:import()
-  for key, value in pairs(self) do
-    if key ~= 'import' then
-      _G[key] = value
+	for key, value in pairs(self) do
+		_G[key] = value
+    if self.types.table(value) then
+      if value.import then
+        value:import()
+      end
     end
-  end
+	end
 end
 
 return M
