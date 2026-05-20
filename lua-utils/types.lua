@@ -144,28 +144,6 @@ function types.dict(x)
   end
 end
 
----Is value a callable (function or table with .call metamethod)
----@param x any
----@return boolean, string?
-function types.callable(x)
-  if x == nil then
-    return false, 'expected function|callable, got nothing'
-  elseif not types.fun(x) and not types.table(x) then
-    return false, sprintf('expected function | callable, got %s', x)
-  elseif types.fun(x) then
-    return true
-  elseif types.table(x) then
-    local mt = getmetatable(x)
-    if mt and mt.__call then
-      return types.callable(mt.__call)
-    else
-      return false, sprintf('expected table with __call, got %s', x)
-    end
-  else
-    return false, 'expected function|callable, got ' .. type(x)
-  end
-end
-
 ---Does value (a table) have a metatable
 ---@param x any
 ---@return boolean, string?
@@ -502,7 +480,7 @@ types.assert = {}
 setmetatable(types.assert, types.assert)
 
 function types.assert:__call(x, cond, name)
-  pp {x, cond, name}
+  pp { x, cond, name }
 
   if name then
     local ok, msg = types.string(name)
@@ -580,7 +558,7 @@ function types.multimethod(x)
   end
 
   local parents = class.parents(x)
-  for i=1, #parents do
+  for i = 1, #parents do
     if parents[i] == 'Multimethod' then
       return true
     end
@@ -589,6 +567,7 @@ function types.multimethod(x)
   return false, 'Expected Multimethod object, got ' .. dump(x)
 end
 
+types.callable = callable
 types.has_metatable = types.hasmetatable
 types.metatable = types.has_metatable
 

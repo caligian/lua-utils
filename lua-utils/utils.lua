@@ -1,57 +1,103 @@
 inspect = require 'lua-utils.inspect'
 local tuple = require('lua-utils.tuple')
 local list = require('lua-utils.list')
+unpack = unpack or table.unpack
+
+
+---@alias Condition (fun(...): boolean) | boolean | nil
+---@alias Mapper (fun(...): any)
+
+---@param cond Condition
+local function run_cond(cond, ...)
+  local cond_type = type(cond)
+  if cond_type == 'boolean' then
+    return cond
+  elseif cond_type == 'function' then
+    return cond(...)
+  elseif cond == nil then
+    return false
+  else
+    error('cond: Expected fun(): bool | boolean, got ' .. (cond_type == nil and 'nil' or cond_type))
+  end
+end
+
+---@param tbl? table
+---@return table
+function refself(tbl)
+  tbl = tbl or {}
+  tbl.__index = tbl
+
+  return setmetatable(tbl, tbl)
+end
 
 --- Dump object as string
 ---@param x any
 ---@return string
 function dump(x)
   if x == nil then
-    return 'nil'
+    return 'NIL'
   elseif type(x) == 'string' then
     return x
   elseif type(x) == 'number' then
     return tostring(x)
+  elseif type(x) == 'table' then
+    if x.as_string then
+      return x:as_string()
+    elseif x.__tostring then
+      return x:__tostring()
+    else
+      return inspect(x, { indent = '  ' })
+    end
   else
-    return inspect(x, { indent = ' ' })
+    return inspect(x, { indent = '  ' })
   end
 end
 
-local function call_if_function(f, ...)
-  if f == nil then
-    return ...
-  elseif type(f) == 'function' then
-    return f(...)
+---Is value a callable (function or table with .call metamethod)
+---@param x any
+---@return boolean, string?
+function callable(x)
+  if x == nil then
+    return false, 'expected function|callable, got nothing'
+  elseif not types.fun(x) and not types.table(x) then
+    return false, sprintf('expected function | callable, got %s', x)
+  elseif types.fun(x) then
+    return true
+  elseif types.table(x) then
+    local mt = getmetatable(x)
+    if mt and mt.__call then
+      return types.callable(mt.__call)
+    else
+      return false, sprintf('expected table with __call, got %s', x)
+    end
   else
-    return f
+    return false, 'expected function|callable, got ' .. type(x)
   end
 end
 
----Functional version of if-else
----If when_true/when_false are functions, call them instead
----@param cond boolean
----@param when_true any
----@param when_false? any
----@return any
-function ifelse(cond, when_true, when_false)
-  if cond then
-    return call_if_function(when_true)
+---@param value any
+---@param skip_fn? boolean (default: true)
+function literal(value, skip_fn)
+  if type(value) == 'function' and skip_fn then
+    return value
   else
-    return call_if_function(when_false)
+    return function()
+      return value
+    end
   end
 end
 
 ---Inverse of ifelse
 ---@param cond boolean
----@param when_true any
----@param when_false? any
+---@param ok any
+---@param err? any
 ---@return any
-function unless(cond, when_false, when_true)
-  if not cond then
-    return call_if_function(when_false)
-  else
-    return call_if_function(when_true)
+---@overload fun(x: any): boolean
+function unless(cond, err, ok)
+  cond = (type(cond) == 'boolean' and cond) or function(x)
+    return not cond(x)
   end
+  return ifelse(cond, err, ok)
 end
 
 ---Call a function with arguments (with pcall optionally)
@@ -79,7 +125,9 @@ end
 function partial(f, ...)
   local args = tuple.pack(...)
   return function(...)
-    list.extend(args, tuple.pack(...))
+    local inner = tuple.pack(...)
+    args = { unpack(args) }
+    list.extend(args, inner)
     return f(unpack(args))
   end
 end
@@ -91,7 +139,9 @@ end
 function rpartial(f, ...)
   local args = tuple.pack(...)
   return function(...)
-    args = list.extend(tuple.pack(...), args)
+    local inner = tuple.pack(...)
+    args = { unpack(args) }
+    args = list.extend(inner, args)
     return f(unpack(args))
   end
 end
@@ -106,7 +156,18 @@ function sprintf(fmt, ...)
   for i = 1, #args do
     local x = args[i]
     local _type = type(x)
-    if _type ~= "string" and type(_type) ~= "number" then
+
+    if _type == 'table' then
+      if x.as_string then
+        args[i] = x:as_string()
+      elseif x.__tostring then
+        args[i] = x:__tostring()
+      else
+        args[i] = dump(x)
+      end
+    elseif _type == 'string' and _type == 'number' then
+      args[i] = tostring(args[i])
+    else
       args[i] = dump(args[i])
     end
   end
@@ -117,44 +178,8 @@ end
 ---Same as sprintf but print the string
 ---@param fmt string
 ---@param ... any
----@return string
 function printf(fmt, ...)
-  local args = tuple.pack(...)
-  list.unpush(args, fmt)
-  local s = apply(sprintf, args)
-  print(s)
-
-  return s
-end
-
----If object ~= nil, then
----@param obj? any
----@param if_nonnil any
----@param if_nil any
----@return any
-function ifnonnil(obj, if_nonnil, if_nil)
-  if obj ~= nil then
-    return call_if_function(if_nonnil)
-  else
-    return call_if_function(if_nil)
-  end
-end
-
----If object == nil, then
----@param obj? any
----@param if_nil any
----@param if_nonnil any
----@return any
-function ifnil(obj, if_nil, if_nonnil)
-  if if_nonnil == nil then
-    if_nonnil = obj
-  end
-
-  if obj == nil then
-    return call_if_function(if_nil)
-  else
-    return call_if_function(if_nonnil)
-  end
+  print(sprintf(fmt, ...))
 end
 
 ---Poor man's thread operator
@@ -185,24 +210,14 @@ function identity(...)
   return ...
 end
 
----Pretty printing
----@param fmt string
----@param ... any
----@return string
-function pprint(fmt, ...)
-  local args = tuple.pack(...)
-  return printf(fmt or '%s', unpack(args))
-end
-
 ---Print a list of dumped values
 ---@param ... any
----@return string?
 function pp(...)
   local args = tuple.pack(...)
   if #args == 0 then
     return
   else
-    return printf('%s', args)
+    printf('%s', args)
   end
 end
 
@@ -260,19 +275,6 @@ function callable(x)
   else
     return false, sprintf('expected table with metamethod __call, got ', mt)
   end
-end
-
----Check if table has a metatable
----@param x any
----@return boolean, string?
-function hasmetatable(x)
-  local x_type = type(x)
-  if x_type ~= 'table' then
-    return false, 'Expected table, got ' .. x_type
-  end
-
-  local mt = getmetatable
-  return mt ~= nil
 end
 
 ---Convert any object into a table by boxing it returning it as-is
@@ -378,46 +380,240 @@ function assertf(cond, msg, ...)
   end
 end
 
-function case(cond, obj, when_true, when_false)
-  if cond(obj) then
-    return call_if_function(when_true, obj)
-  else
-    return call_if_function(when_false, obj)
+---Metatable management utilities
+---@overload fun(x: table, key?: string | number): any
+---@overload fun(x: table): table?
+metatable = refself {}
+
+---Check if a metatable field exists
+---@param x table
+---@return boolean
+function metatable.exists(x)
+  return getmetatable(x) ~= nil
+end
+
+---Get a metatable or metatable field
+---@param x table
+---@return table?
+function metatable.get(x)
+  return getmetatable(x)
+end
+
+---Get a metatable or metatable field
+---@param x table
+---@param key string
+---@return table?
+function metatable.get_key(x, key)
+  local mt = getmetatable(x)
+  if mt then
+    return mt[key]
   end
 end
 
----@class switch.form
----@field [1]? fun(x: any): boolean For checking condition
----@field [2]? fun(x: any): any For returning value
----@field when? (fun(x: any): boolean) Alias for [1]
----@field apply? (fun(x: any): any) Alias for [2]
+---@param x table
+---@param ks []string
+---@return table<string,any>?
+function metatable.get_keys(x, ks)
+  local mt = getmetatable(x)
+  if mt == nil then
+    return nil
+  end
 
----@param obj any
----@param default_callback fun(x: any): any
----@param ... switch.form
+  local res = {}
+  for k, v in pairs(mt) do
+    res[k] = v
+  end
+
+  return res
+end
+
+---Set a metatable or metatable field
+---@param x table
+---@param mt table
+---@return table
+function metatable.set(x, mt)
+  return setmetatable(x, mt)
+end
+
+---Set a metatable or metatable field
+---@param x table
+---@param key string
+---@param value any
+---@return table
+function metatable.set_key(x, key, value)
+  local mt = metatable.get(x) or {}
+  mt[key] = value
+
+  return setmetatable(x, mt)
+end
+
+---@param x table
+---@param keys_and_values table<string,any>
+---@return table
+function metatable.set_keys(x, keys_and_values)
+  local mt = getmetatable(x) or {}
+  for key, value in pairs(keys_and_values) do
+    mt[key] = value
+  end
+
+  return setmetatable(x, mt)
+end
+
+---@param x any
+---@param ok? (fun(x): any)
+---@param ... any Arguments to pass when x is defined and cond is a function
 ---@return any
-function switch(obj, default_callback, ...)
-  local specs = { ... }
-  local validate_spec = function(i, spec)
-    local when = spec.when or spec[1]
-    local _apply = spec.apply or spec[2]
-
-    if type(when) ~= 'function' then
-      errorf('switch[%d].when: Expected function, got %s', i, type(when))
+---@overload fun(x: any): boolean
+function undefined(x, ok, ...)
+  if x == nil then
+    if ok ~= nil then
+      return run_cond(ok, ...)
+    else
+      return true
     end
-
-    if type(_apply) ~= 'function' then
-      errorf('switch[%d].apply: Expected function, got %s', i, type(_apply))
-    end
-
-    return when, _apply
+  else
+    return false
   end
-
-  for i = 1, #specs do
-    local when, _apply = validate_spec(i, specs[i])
-    if when(obj) then return _apply(obj) end
-  end
-
-  return default_callback(obj)
 end
 
+---@param x any
+---@param ok? (fun(x): any)
+---@param ... any Arguments to pass when x is defined and cond is a function
+---@return any
+---@overload fun(x: any): boolean
+function defined(x, ok, ...)
+  if x ~= nil then
+    if ok ~= nil then
+      return run_cond(ok, ...)
+    else
+      return true
+    end
+  else
+    return false
+  end
+end
+
+---@class ifelse_opts
+---@field ok? []any
+---@field err? []any
+---@field cond? []any
+
+---@param cond? Condition
+---@param true_fn? (fun(x): any)
+---@param false_fn? (fun(x): any)
+---@param opts? ifelse_opts
+---@return any
+---@overload fun(x: any): boolean
+function ifelse(cond, true_fn, false_fn, opts)
+  opts = opts or {}
+  local ok_args = opts.ok or {}
+  local err_args = opts.err or {}
+  local cond_args = opts.cond or {}
+  local cond_type = type(cond)
+  local cond_fn = cond_type == 'function'
+  local cond_bool = cond_type == 'boolean'
+  local ok = false
+
+  if cond_fn then
+    ok = cond_fn(unpack(cond_args))
+  elseif cond_bool then
+    ok = cond_bool
+  elseif cond == nil then
+    ok = false
+  end
+
+  if not ok then
+    if false_fn then
+      return false_fn(unpack(err_args))
+    else
+      return false
+    end
+  elseif true_fn then
+    return true_fn(unpack(ok_args))
+  else
+    return true
+  end
+end
+
+---@param value any
+---@return (fun(): any)
+function literal(value)
+  return function() return value end
+end
+
+---@param x boolean
+function invert(x)
+  return not x
+end
+
+---For equality checks - to eliminate the nonsense of operators
+equals = refself {}
+
+---@param x any
+---@param y any
+---@return boolean
+function equals.equals(x, y)
+  return x == y
+end
+
+---@param x any
+---@param y any
+---@return boolean
+function equals.invert(x, y)
+  return invert(equals(x, y))
+end
+
+function equals:__call(x, y, invert)
+  if invert then
+    return equals.equals(x, y)
+  else
+    return equals.invert(x, y)
+  end
+end
+
+---@overload fun(cond: boolean | (fun(): boolean), fmt: string, ...: string)
+claim = refself {}
+
+---@param x any
+---@param ... string
+---@return boolean?
+function claim.type(x, ...)
+  local x_type = type(x)
+  x_type = x_type == nil and 'nil' or x_type
+  local expected_args = { ... }
+
+  for _, expected in ipairs(expected_args) do
+    if x_type ~= expected then
+      local exp_type = expected == nil and 'nil' or expected
+      error(string.format('x: Expected %s, got %s', exp_type, x_type))
+    else
+      return true
+    end
+  end
+
+  return false
+end
+
+---@param cond (fun(): boolean) | boolean
+---@param fmt string
+---@param ... string
+function claim.when(cond, fmt, ...)
+  local cond_type = type(cond)
+  local fmt_type = type(fmt)
+  local cond_is_boolean = cond_type == 'boolean'
+  local cond_is_fun = cond_type == 'function'
+
+  if (not cond_is_boolean) and (not cond_is_fun) then
+    error(
+      'cond: Expected boolean | (fun(): boolean), got ' ..
+      (cond_type == nil and 'nil' or cond_type)
+    )
+  end
+
+  if invert(fmt_type == 'string') then
+    error(
+      'fmt: Expected string, got ' ..
+      (fmt_type == nil and 'nil' or fmt_type)
+    )
+  end
+end

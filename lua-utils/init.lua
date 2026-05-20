@@ -23,13 +23,15 @@ local M = {
 
 function M:import()
 	for key, value in pairs(self) do
-		_G[key] = value
-    if self.types.table(value) then
-      if value.import then
-        value:import()
+    if key ~= 'import' then
+      _G[key] = value
+      if self.types.table(value) then
+        if value.import then
+          value:import()
+        end
       end
     end
-	end
+  end
 end
 
 return M
