@@ -407,7 +407,7 @@ dict.fmerge = dict.force_merge
 
 function dict.set_unless(x, ks, value, force)
   if not dict.has(x, ks) then
-    force = ifnil(force, true)
+    force = undefined(force, true)
     return dict.set(x, ks, value, force)
   end
 end

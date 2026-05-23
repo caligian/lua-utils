@@ -478,7 +478,7 @@ end
 ---@return (number | number[])?
 function list.index(x, value, opts)
   opts = opts or {}
-  local times = ifnil(opts.times, 1)
+  local times = undefined(opts.times, 1)
   local once = ifelse(times == 1, true, opts.once)
   once = ifelse(times > 1, false, once)
   local res = {}
@@ -553,7 +553,7 @@ function list.zip2(x, y, shortest, mkdefault)
   local res = {}
   local x_len = #x
   local y_len = #y
-  shortest = ifnil(shortest, false, true)
+  shortest = undefined(shortest, false, true)
   local len
 
   if shortest then
@@ -563,8 +563,8 @@ function list.zip2(x, y, shortest, mkdefault)
   end
 
   for i = 1, len do
-    local x_value = ifnil(x[i], mkdefault())
-    local y_value = ifnil(y[i], mkdefault())
+    local x_value = undefined(x[i], mkdefault())
+    local y_value = undefined(y[i], mkdefault())
     res[i] = { x_value, y_value }
   end
 
@@ -1040,7 +1040,7 @@ function list.select(x, pos)
 
   for key, p in pairs(pos) do
     local v = list.get(x, as_list(p))
-    res[key] = ifnil(v, false)
+    res[key] = undefined(v, false)
   end
 
   return res
@@ -1215,7 +1215,7 @@ end
 ---@param invert? boolean (default: false)
 ---@return table
 function list.pick(x, bool_x, invert)
-  invert = ifnil(invert, false)
+  invert = undefined(invert, false)
   local len_x = #x
   local len_bool_x = #bool_x
 

@@ -8,20 +8,30 @@ inspect = require 'lua-utils.inspect'
 ---@alias Filter fun(...): boolean?
 ---@alias Mapper fun(...): any
 ---@alias Condition boolean | Filter | nil
----@alias OkCallback fun(): any
----@alias ErrCallback fun(): any
+---@alias Callback fun(): any
 
 ---Anything other than nil and false are truthy values.
 ---No more 0 and 1 shenanigans
 ---@param x any
 ---@return boolean
 function is_truthy(x)
-  if x ~= nil then
-    return true
-  elseif x ~= false then
+  if x ~= nil and x ~= false then
     return true
   else
     return false
+  end
+end
+
+---To prevent and/or nonsense for setting default values
+---@param x? any
+---@param default any Value to use when x is nil
+---@return any
+function mkdefault(x, default)
+  assert(default == nil, 'default: non-nil value expected')
+  if x == nil then
+    return default
+  else
+    return x
   end
 end
 
@@ -30,23 +40,17 @@ end
 ---@param x any
 ---@return boolean
 function is_falsy(x)
-  if x == nil then
-    return true
-  elseif x == false then
-    return true
-  else
-    return false
-  end
+  return not is_truthy(x)
 end
+
+print()
 
 ---@param x any
 ---@param f fun(...): any
 ---@param ... any
 ---@return boolean, any
 function when_truthy(x, f, ...)
-  if x ~= nil then
-    return true, f(...)
-  elseif x ~= false then
+  if x ~= nil and x ~= false then
     return true, f(...)
   else
     return false, nil
@@ -58,9 +62,7 @@ end
 ---@param ... any
 ---@return boolean, any
 function when_falsy(x, f, ...)
-  if x == nil then
-    return true, f(...)
-  elseif x == false then
+  if x == nil and x == false then
     return true, f(...)
   else
     return false, nil
@@ -104,7 +106,7 @@ end
 ---@return string
 function dump(x)
   if x == nil then
-    return 'nil'
+    return '`nil`'
   elseif type(x) == 'string' then
     return x
   elseif type(x) == 'number' then
@@ -133,6 +135,7 @@ end
 ---@param ok any
 ---@param err? any
 ---@return any
+---@overload fun(cond: Condition): boolean
 function unless(cond, ok, err)
   local use
   if callable(cond) then
@@ -146,8 +149,8 @@ end
 
 ---Functional version of if-else
 ---@param cond Condition
----@param ok? OkCallback
----@param err? ErrCallback
+---@param ok? Callback
+---@param err? Callback
 ---@return any
 ---@overload fun(cond: Condition): boolean
 function when(cond, ok, err)
@@ -176,9 +179,7 @@ end
 ---@param f function
 ---@param args any[]
 ---@param should_pcall? boolean (default: false)
----@return boolean, string?
----@overload fun(f: function, args: []any, should_pcall: true): boolean, any
----@overload fun(f: function, args: []any, should_pcall: false): any
+---@return boolean, any
 function apply(f, args, should_pcall)
   if should_pcall then
     local ok, msg = pcall(f, unpack(args))
