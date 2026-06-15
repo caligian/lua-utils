@@ -1,9 +1,9 @@
 local _ = require 'lua-utils._'
-local metatable = require 'lua-utils.metatable'
+require 'lua-utils.metatable'
+require 'lua-utils.dump'
 local tuple = require('lua-utils.tuple')
 
 unpack = unpack or table.unpack
-inspect = require 'lua-utils.inspect'
 
 ---@alias Filter fun(...): boolean?
 ---@alias Mapper fun(...): any
@@ -22,28 +22,17 @@ function is_truthy(x)
   end
 end
 
----To prevent and/or nonsense for setting default values
----@param x? any
----@param default any Value to use when x is nil
----@return any
-function mkdefault(x, default)
-  assert(default == nil, 'default: non-nil value expected')
-  if x == nil then
-    return default
-  else
-    return x
-  end
-end
-
 ---nil and false are falsy values
 ---No more 0 and 1 shenanigans
 ---@param x any
 ---@return boolean
 function is_falsy(x)
-  return not is_truthy(x)
+  if x == false or x == nil then
+    return true
+  else
+    return false
+  end
 end
-
-print()
 
 ---@param x any
 ---@param f fun(...): any
@@ -62,7 +51,7 @@ end
 ---@param ... any
 ---@return boolean, any
 function when_falsy(x, f, ...)
-  if x == nil and x == false then
+  if x == nil or x == false then
     return true, f(...)
   else
     return false, nil
@@ -98,29 +87,6 @@ function callable(x, err_msg)
     return callable(mt.__call)
   else
     return false, "x: No __call metamethod defined"
-  end
-end
-
---- Dump object as string
----@param x any
----@return string
-function dump(x)
-  if x == nil then
-    return '`nil`'
-  elseif type(x) == 'string' then
-    return x
-  elseif type(x) == 'number' then
-    return tostring(x)
-  elseif type(x) == 'table' then
-    if x.as_string then
-      return x:as_string()
-    elseif x.__tostring then
-      return x:__tostring()
-    else
-      return inspect(x, { indent = '  ' })
-    end
-  else
-    return inspect(x, { indent = '  ' })
   end
 end
 
@@ -174,12 +140,16 @@ function when(cond, ok, err)
   end
 end
 
+apply = bless {}
+
 ---Call a function with arguments (with pcall optionally)
 ---Do not return more than 2 arguments, variadic returns other than 2 can cause chaos
 ---@param f function
 ---@param args any[]
 ---@param should_pcall? boolean (default: false)
 ---@return boolean, any
+---@overload fun(f: function, args: []any, should_pcall: true): boolean, any
+---@overload fun(f: function, args: []any, should_pcall: false): ...
 function apply(f, args, should_pcall)
   if should_pcall then
     local ok, msg = pcall(f, unpack(args))
@@ -194,14 +164,17 @@ function apply(f, args, should_pcall)
 end
 
 ---Curry functions with arguments at the beginning of the function call
+---Remember that outer arguments will not be mutable
+---This is not a closure
 ---@param default any non-nil value
 ---@param f function
 ---@param ... any Outer function arguments
 ---@return function
 function partial(default, f, ...)
-  local outer = tuple.pack(default, ...)
+  local outer_args = tuple.pack(default, ...)
   return function(...)
     local inner = tuple.pack(default, ...)
+    local outer = {unpack(outer_args)}
     local len = #outer
 
     for i=1, #inner do
@@ -214,14 +187,17 @@ function partial(default, f, ...)
 end
 
 ---Curry functions with arguments at the beginning of the function call
+---Remember that outer arguments will not be mutable
+---This is not a closure
 ---@param default any non-nil value
 ---@param f function
 ---@param ... any Outer function arguments
 ---@return function
 function rpartial(default, f, ...)
-  local outer = tuple.pack(default, ...)
+  local outer_args = tuple.pack(default, ...)
   return function(...)
     local inner = tuple.pack(default, ...)
+    local outer = {unpack(outer_args)}
     local len = #inner
 
     for i=1, #outer do
@@ -233,40 +209,6 @@ function rpartial(default, f, ...)
   end
 end
 
----Basically string.format with automatic table dumping
----@param fmt string
----@param ... any
----@return string
-function sprintf(fmt, ...)
-  local args = tuple.pack('`nil`', ...)
-
-  for i = 1, #args do
-    local x = args[i]
-    local _type = type(x)
-
-    if _type == 'table' then
-      local mt = getmetatable(x)
-      if mt and mt.__tostring then
-        args[i] = mt.__tostring(x)
-      else
-        args[i] = dump(x)
-      end
-    elseif _type == 'string' and _type == 'number' then
-      args[i] = tostring(args[i])
-    else
-      args[i] = inspect(args[i])
-    end
-  end
-
-  return string.format(fmt, unpack(args))
-end
-
----Same as sprintf but print the string
----@param fmt string
----@param ... any
-function printf(fmt, ...)
-  print(sprintf(fmt, ...))
-end
 
 ---Return argument as is
 ---@param x any
@@ -334,55 +276,6 @@ function thread.pcall(obj, ...)
   end
 
   return true, res
-end
-
----Print a list of dumped values
----Do not mistake this with sprintf
----@param default non-nil value
----@param ... any
-function pp(default, ...)
-  local args = tuple.pack(default, ...)
-  if #args == 0 then
-    return
-  else
-    printf('%s', args)
-  end
-end
-
----Similar to R's paste0
----@param ... string 
----@return string
-function paste0(...)
-  return table.concat({...}, '')
-end
-
----Similar to R's paste0
----@param sep? string (default: ' ')
----@param ... string 
----@return string
-function paste(sep, ...)
-  return table.concat({...}, sep or ' ')
-end
-
----Similar to python's callable. Check if object is callable
----@param x any
----@return boolean, string?
-function callable(x)
-  local type_ = type(x)
-  if type_ == 'function' then
-    return true
-  elseif type_ ~= 'table' then
-    return false, sprintf('expected table with __call metatamethod, got ', x)
-  end
-
-  local mt = getmetatable(x)
-  if not mt then
-    return false, sprintf('expected table with metatable, got %s', x)
-  elseif mt.__call then
-    return callable(mt.__call)
-  else
-    return false, sprintf('expected table with metamethod __call, got ', mt)
-  end
 end
 
 ---Convert any object into a table by boxing it returning it as-is
@@ -588,7 +481,7 @@ function invert(x)
 end
 
 ---For equality checks - to eliminate the nonsense of operators
-equals = refself {}
+equals = bless {}
 
 ---@param x any
 ---@param y any
@@ -635,7 +528,13 @@ end
 ---@param fmt string
 ---@param ... string
 function assert_when(cond, fmt, ...)
-  local ok = ((callable(cond)) and cond()) or cond
+  local ok
+  if callable(cond) then
+    ok = cond()
+  else
+    ok = cond
+  end
+
   if not ok then
     errorf(fmt, ...)
   else
@@ -644,8 +543,65 @@ function assert_when(cond, fmt, ...)
 end
 
 function assert_unless(cond, fmt, ...)
-  local use = ((callable(cond)) and not cond()) or cond
-  return assert_when(cond, fmt, ...)
+  local ok
+  if callable(cond) then
+    ok = cond()
+  else
+    ok = cond
+  end
+  return assert_when(not ok, fmt, ...)
+end
+
+---Get the actual size of tables or get string length
+---@return param x string|table
+---@return number
+function size(x)
+  local x_type = type(x)
+  if x_type ~= 'table' and x_type ~= 'string' then
+    errorf('x: Expected string|table, got %s', x)
+  elseif type(x) == 'string' then
+    return #x
+  end
+
+  local size = 0
+  for _, _ in pairs(x) do
+    size = size + 1
+  end
+
+  return size
+end
+
+---Get the actual size of tables or get string length
+---@return param x string|table
+---@return number
+function length(x)
+  if x ~= 'table' and x ~= 'string' then
+    errorf('x: Expected string|table, got %s', x)
+  end
+
+  return #x
+end
+
+---For hybrid dict+list tables, this will check the dict size, beware!
+---@param x string|table
+---@return boolean
+function is_empty(x)
+  if type(x) == 'string' then
+    return #x == 0
+  end
+
+  local size = 0
+  for _, _ in pairs(x) do
+    size = size + 1
+  end
+
+  return size
+end
+
+---@param x string|table
+---@return boolean
+function has_values(x)
+  return not is_empty(x)
 end
 
 L = literal
@@ -653,3 +609,4 @@ when_nil = undefined
 unless_nil = defined
 unless_truthy = when_falsy
 unless_falsy = when_truthy
+is_not_empty = has_values

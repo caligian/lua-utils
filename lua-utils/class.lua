@@ -1,6 +1,8 @@
+require 'lua-utils.metatable'
+require 'lua-utils.utils'
+
 local list = require 'lua-utils.list'
 local copy = require 'lua-utils.copy'
-require 'lua-utils.utils'
 
 ---@class class
 ---@field __attributes table<string,boolean> All class attributes set
@@ -19,7 +21,7 @@ require 'lua-utils.utils'
 
 ---Create classes and instances
 ---@overload fun(name: string, inherits?: table, ...: any): class
-local class = {}
+class = {}
 
 setmetatable(class, class)
 

@@ -1,20 +1,14 @@
+require 'lua-utils.metatable'
 require 'lua-utils.utils'
+
 local list = require('lua-utils.list')
 local dict = require('lua-utils.dict')
 local class = require('lua-utils.class')
-local err = require 'lua-utils.error'
 local types = {}
 
 types.object = class.is_object
 types.instance = class.is_instance
 types.class = class.is_class
-types.error = err.is_error
-types.error_instance = err.is_error_instance
-types.error_class = err.is_error_class
-types.result = err.is_result
-types.failure = err.is_failure
-types.success = err.is_success
-types.unwrap_error = err.is_unwrap_error
 
 ---Is value thread
 ---@param x any

@@ -10,7 +10,7 @@ end
 ---@return table
 function dict.keys(x)
   --- Stub method
-  return {x}
+  return { x }
 end
 
 dict.keys = {}
@@ -55,7 +55,7 @@ function dict.keys.difference(x, y)
 
   for x_key in pairs(x_ks) do
     if not y[x_key] then
-      res[ind+1] = x_key
+      res[ind + 1] = x_key
       ind = ind + 1
     end
   end
@@ -75,14 +75,14 @@ function dict.keys.intersection(x, y)
   for x_key in pairs(x) do
     if y[x_key] then
       cache[x_key] = true
-      res[ind+1] = x_key
+      res[ind + 1] = x_key
       ind = ind + 1
     end
   end
 
   for y_key in pairs(y) do
     if x[y_key] and not cache[y_key] then
-      res[ind+1] = y_key
+      res[ind + 1] = y_key
       ind = ind + 1
     end
   end
@@ -101,19 +101,19 @@ function dict.keys.union(x, y)
   local res = {}
   local ind = 0
 
-  for i=1, #x_ks do
+  for i = 1, #x_ks do
     local k = x_ks[i]
     if not cache[k] then
-      res[ind+1] = k
+      res[ind + 1] = k
       cache[k] = true
       ind = ind + 1
     end
   end
 
-  for i=1, #y_ks do
+  for i = 1, #y_ks do
     local k = y_ks[i]
     if not cache[k] then
-      res[ind+1] = k
+      res[ind + 1] = k
       cache[k] = true
       ind = ind + 1
     end
@@ -152,7 +152,7 @@ end
 ---Get dict size
 ---@param x table
 ---@return number
-function dict.size(x)
+function dict.length(x)
   local n = 0
   for _ in pairs(x) do
     n = n + 1
@@ -160,29 +160,31 @@ function dict.size(x)
   return n
 end
 
-dict.len = dict.size
-dict.length = dict.len
-
 ---Is dict empty?
 ---@param x table
 ---@return boolean
-function dict.empty(x)
+function dict.is_empty(x)
   for _ in pairs(x) do return false end
   return true
 end
 
-dict.is_empty = dict.empty
-
----Set value at keys
+---Set or force set value at keys
 ---@param x table
 ---@param ks table
 ---@param value any
 ---@param force? boolean (default: false)
+---@return table?
 function dict.set(x, ks, value, force)
-  local _x = x
-  for i=1, #ks-1 do
+  local level1 = x
+
+  if type(ks) ~= 'table' then
+    ks = { ks }
+  end
+
+  for i = 1, #ks - 1 do
     local k = ks[i]
     local v = x[k]
+
     if type(v) == 'table' then
       x = v
     elseif not force then
@@ -194,25 +196,29 @@ function dict.set(x, ks, value, force)
   end
 
   x[ks[#ks]] = value
-  return _x
+  return level1
 end
 
 ---Force set value at keys and create tables if necessary
 ---@param x table
 ---@param ks table
 ---@param value any
-function dict.force_set(x, ks, value)
+function dict.put(x, ks, value)
   return dict.set(x, ks, value, true)
 end
 
-dict.fset = dict.force_set
+dict.force_set = dict.put
 
 ---Check if keys exist
 ---@param x table
 ---@param ks table
 ---@return boolean
 function dict.has(x, ks)
-  for i=1, #ks-1 do
+  if type(ks) ~= 'table' then
+    ks = { ks }
+  end
+
+  for i = 1, #ks - 1 do
     local k = ks[i]
     local v = x[k]
     if type(v) ~= 'table' then
@@ -225,20 +231,26 @@ function dict.has(x, ks)
   return x[ks[#ks]] ~= nil
 end
 
----Check if keys exist and return the value. When invalid keys are passed, return arguments are both nil otherwise the value and the level of the found are returned
----Usage:
----> value, tbl_level = dict.get(<table>, {<ks>, ...})
----> value, ok = dict.get(<table>, {<ks>, ...})
+---Check if keys exist and return the value.
 ---@param x table
 ---@param ks table
----@param map? fun(x: any): any
----@return any, table?
-function dict.get(x, ks, map)
-  for i=1, #ks-1 do
+---@param default? (fun(): any)
+---@return any, table
+function dict.get(x, ks, default)
+  if type(ks) ~= 'table' then
+    ks = { ks }
+  end
+
+  for i = 1, #ks - 1 do
     local k = ks[i]
     local v = x[k]
+
     if type(v) ~= 'table' then
-      return nil, nil
+      if default then
+        return default(), x
+      else
+        return nil, x
+      end
     else
       x = v
     end
@@ -246,15 +258,12 @@ function dict.get(x, ks, map)
 
   local v = x[ks[#ks]]
   if v ~= nil then
-    if map then return map(v) end
     return v, x
+  elseif default then
+    return default(), x
   else
-    return nil, nil
+    return nil, x
   end
-end
-
-function dict.has_path(x, ks)
-  return type((dict.get(x, ks))) == 'table'
 end
 
 function dict.contains(x, value, cmp)
@@ -288,7 +297,7 @@ function dict.filter(x, f, map)
 end
 
 function dict.compare(x, y, cmp, res)
-  cmp = cmp or function (a, b) return a == b end
+  cmp = cmp or function(a, b) return a == b end
   res = res or {}
 
   for key, value in pairs(x) do
@@ -324,24 +333,28 @@ function dict.is_dict(x)
   return n ~= #x
 end
 
-function dict.take(x, ks, filter, map)
-  local res = {}
-  for _, k in ipairs(ks) do res[k] = x[k] end
+function dict.select(x, ks, filter, map)
+  if type(ks) ~= 'table' then
+    ks = { ks }
+  end
 
+  local res = {}
+
+  for _, k in ipairs(ks) do res[k] = x[k] end
   if filter then res = dict.filter(x, filter) end
   if map then res = dict.map(x, map) end
 
   return res
 end
 
-dict.select = dict.take
-
-function dict.flatten(x, collapse, res, last_key)
-  collapse = collapse or '.'
-  res = res or {}
+function dict.flatten(x, opts)
+  opts = opts or {}
+  local sep = opts.sep or '.'
+  local result = opts.result or {}
+  local parent_key = opts.parent_key
   local function create_key(k)
-    if last_key then
-      return last_key .. collapse .. k
+    if parent_key then
+      return parent_key .. sep .. k
     else
       return k
     end
@@ -349,61 +362,79 @@ function dict.flatten(x, collapse, res, last_key)
 
   for key, value in pairs(x) do
     if type(value) == 'table' then
-      dict.flatten(value, collapse, res, create_key(key))
+      dict.flatten(value, {
+        sep = sep,
+        result = result,
+        parent_key = create_key(key)
+      })
     else
-      res[create_key(key)] = value
+      result[create_key(key)] = value
     end
   end
 
-  return res
+  return result
 end
-
-local function join_tables(x, y, force, visited)
-  visited = visited or setmetatable({}, {__mode = 'k'})
-  local cache = function (a, b)
-    visited[a] = visited[a] or {}
-    visited[a][b] = true
-  end
-  local exists = function (a, b)
-    local ok = visited[a]
-    if ok then return ok[b] end
-  end
-
-  for key, value in pairs(y) do
-    local x_value = x[key]
-    local y_value = value
-    local x_type = type(x_value)
-    local y_type = type(y_value)
-    local x_is_table = x_type == 'table'
-    local y_is_table = y_type == 'table'
-
-    if x_value == nil then
-      x[key] = y_value
-    elseif y_is_table then
-      if force then
-        x[key] = y_value
-      elseif x_is_table and not exists(y_value, x_value) then
-        cache(y_value, x_value)
-        join_tables(x_value, y_value, force, visited)
-      end
-    elseif force then
-      x[key] = y_value
-    elseif x_value == nil then
-      x[key] = y_value
-    end
-  end
-end
-
+---@param x? table
+---@param y? table
+---@param force? boolean
+---@return table
 function dict.merge(x, y, force)
-  join_tables(x, y, force)
-  return x
+  local function join_tables(_x, _y, _force, visited)
+    visited = visited or setmetatable({}, { __mode = 'k' })
+    local cache = function(a, b)
+      visited[a] = visited[a] or {}
+      visited[a][b] = true
+    end
+    local exists = function(a, b)
+      local ok = visited[a]
+      if ok then return ok[b] end
+    end
+
+    for key, value in pairs(_y) do
+      local x_value = _x[key]
+      local y_value = value
+      local x_type = type(x_value)
+      local y_type = type(y_value)
+      local x_is_table = x_type == 'table'
+      local y_is_table = y_type == 'table'
+
+      if x_value == nil then
+        _x[key] = y_value
+      elseif y_is_table then
+        if x_is_table then
+          join_tables(x_value, y_value, _force, visited)
+          cache(y_value, x_value)
+        elseif force then
+          _x[key] = y_value
+        end
+      elseif force then
+        _x[key] = y_value
+      elseif x_value == nil then
+        _x[key] = y_value
+      end
+    end
+  end
+
+  if x and y then
+    join_tables(x, y, force)
+    return x
+  elseif y then
+    return y
+  elseif x then
+    return x
+  end
+
+  return {}
 end
 
+---@param x? table
+---@param y? table
+---@return table
 function dict.force_merge(x, y)
   return dict.merge(x, y, true)
 end
 
-dict.fmerge = dict.force_merge
+dict.mergef = dict.force_merge
 
 function dict.set_unless(x, ks, value, force)
   if not dict.has(x, ks) then
@@ -414,7 +445,7 @@ end
 
 function dict.from_keys(ks, default_fn)
   local res = {}
-  for i=1, #ks do
+  for i = 1, #ks do
     res[ks[i]] = default_fn()
   end
   return res
@@ -431,7 +462,7 @@ function dict.items(x)
   local ind = 1
 
   for key, value in pairs(x) do
-    res[ind] = {key, value}
+    res[ind] = { key, value }
     ind = ind + 1
   end
 
@@ -535,10 +566,10 @@ end
 
 function dict.pop(x, ...)
   local res = {}
-  local args = {...}
+  local args = { ... }
   local ind = 1
 
-  for i=1, #args do
+  for i = 1, #args do
     local ks = args[i]
     local value = dict.pop(x, ks)
     res[ind] = value

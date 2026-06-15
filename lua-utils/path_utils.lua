@@ -75,7 +75,7 @@ end
 
 ---List files recursively
 ---@param dirname string
----@param opts ls_options
+---@param opts? ls_options
 ---@return string[]
 function path.ls(dirname, opts)
   local function create_context(filename, filetype)
@@ -118,7 +118,7 @@ function path.ls(dirname, opts)
     end
 
     for i = 1, #next_dirs do
-      result[#result+1] = next_dirs[i]
+      result[#result + 1] = next_dirs[i]
       list_files(next_dirs[i], {
         include = include,
         depth = required_depth,
@@ -342,5 +342,6 @@ path.fs.rm_r = path.fs.removedirs
 path.fs.rm = path.fs.remove
 path.fs.cp = path.fs.copy
 path.fs.ln = path.fs.symlink
+basename = path.name
 
 return path

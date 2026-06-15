@@ -3,26 +3,26 @@ require 'lua-utils.utils'
 
 ---String matching utilities for template strings
 local placeholder = {}
-local pyproject_toml = [[[project]
-name = "{name}"
-version = "0.0.1"
-authors = [
-  \\{ name="{author}", email="{email}" \\},
-]
-description = "A small example package"
-readme = "README.md"
-requires-python = ">={version}"
-classifiers = [
-  "Programming Language :: Python :: 3",
-  "Operating System :: OS Independent",
-]
-license = "{license}"
-license-files = ["LICEN[CS]E*"]
-
-[project.urls]
-Homepage = "https://github.com/{username}/{name}"
-Issues = "https://github.com/{username}/{name}/issues"
-]]
+-- local pyproject_toml = [[[project]
+-- name = "{name}"
+-- version = "0.0.1"
+-- authors = [
+--   \\{ name="{author}", email="{email}" \\},
+-- ]
+-- description = "A small example package"
+-- readme = "README.md"
+-- requires-python = ">={version}"
+-- classifiers = [
+--   "Programming Language :: Python :: 3",
+--   "Operating System :: OS Independent",
+-- ]
+-- license = "{license}"
+-- license-files = ["LICEN[CS]E*"]
+-- 
+-- [project.urls]
+-- Homepage = "https://github.com/{username}/{name}"
+-- Issues = "https://github.com/{username}/{name}/issues"
+-- ]]
 
 
 ---Check if placeholder name is valid

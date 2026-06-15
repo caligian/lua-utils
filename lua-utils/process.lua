@@ -209,4 +209,7 @@ function process:import()
   _G.Popen = process.Popen
 end
 
+systemlist = process.systemlist
+system = process.system
+
 return process
