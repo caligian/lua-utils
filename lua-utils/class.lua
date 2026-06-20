@@ -4,35 +4,44 @@ require 'lua-utils.utils'
 local list = require 'lua-utils.list'
 local copy = require 'lua-utils.copy'
 
----@class class
+---@class class.shape
 ---@field __attributes table<string,boolean> All class attributes set
 ---@field __methods table<string,boolean> All class methods set
 ---@field __metamethods table<string,boolean> All class metamatehods set
 ---@field __metaattributes table<string,boolean> All class metaattributes (variables starting with '__')
 ---@field __object boolean Always true for classes and instances
 ---@field __instance boolean Always true for instances and false otherwise
----@field __inherits? class class to inherit from
+---@field __inherits? class.shape class to inherit from
 ---@field __name string class name
 
----@class instance : class
----@field __class class Underlying class
+---@class instance.shape : class.shape
+---@field __class class.shape Underlying class
 
----@alias object class | instance
+---@alias object.shape class.shape | instance.shape
 
 ---Create classes and instances
----@overload fun(name: string, inherits?: table, ...: any): class
+---@overload fun(name: string, inherits?: table, ...: any): class.shape
 class = {}
 
 setmetatable(class, class)
 
 ---Is table an object
 ---@param obj table
+---@param msg? boolean
 ---@return boolean, string?
-function class.is_object(obj)
+function class.is_object(obj, msg)
   if type(obj) ~= 'table' then
-    return false, ('expected table, got ' .. dump(obj))
+    if msg then
+      return false, ('Expected table, got ' .. dump(obj))
+    else
+      return false
+    end
   elseif not obj.__object then
-    return false, ('expected object, got ' .. dump(obj))
+    if msg then
+      return false, ('Expected object, got ' .. dump(obj))
+    else
+      return false
+    end
   else
     return true
   end
@@ -43,11 +52,11 @@ end
 ---@return boolean, string?
 function class.is_instance(obj)
   if type(obj) ~= 'table' then
-    return false, ('expected table, got ' .. dump(obj))
+    return false, ('Expected table, got ' .. dump(obj))
   elseif not obj.__object then
-    return false, ('expected object, got ' .. dump(obj))
+    return false, ('Expected object, got ' .. dump(obj))
   elseif not obj.__instance then
-    return false, ('expected instance, got class: ' .. dump(obj))
+    return false, ('Expected instance, got class: ' .. dump(obj))
   else
     return true
   end
@@ -55,14 +64,27 @@ end
 
 ---Is table an class?
 ---@param obj table
+---@param msg? boolean
 ---@return boolean, string?
-function class.is_class(obj)
+function class.is_class(obj, msg)
   if type(obj) ~= 'table' then
-    return false, ('expected table, got ' .. dump(obj))
+    if msg then
+      return false, ('Expected table, got ' .. dump(obj))
+    else
+      return false
+    end
   elseif not obj.__object then
-    return false, ('expected object, got ' .. dump(obj))
+    if msg then
+      return false, ('Expected object, got ' .. dump(obj))
+    else
+      return false
+    end
   elseif obj.__instance then
-    return false, ('expected class, got instance: ' .. dump(obj))
+    if msg then
+      return false, ('Expected class, got instance: ' .. dump(obj))
+    else
+      return false
+    end
   else
     return true
   end
@@ -110,6 +132,9 @@ end
 function class.is_child_of(obj, cls)
   return class.inherits(obj, cls)
 end
+
+class.is_parent = class.is_parent_of
+class.is_child = class.is_child_of
 
 ---Clone object
 ---@param x object

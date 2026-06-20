@@ -1,14 +1,16 @@
 require 'lua-utils.metatable'
 require 'lua-utils.utils'
 
+local copy = require 'lua-utils.copy'
 local list = require('lua-utils.list')
-local dict = require('lua-utils.dict')
 local class = require('lua-utils.class')
 local types = {}
 
-types.object = class.is_object
-types.instance = class.is_instance
-types.class = class.is_class
+---@param x any
+---@return boolean
+function types.callable(x)
+  return callable(x, true)
+end
 
 ---Is value thread
 ---@param x any
@@ -19,7 +21,7 @@ function types.thread(x)
   else
     local ok
     ok = type(x) == 'thread'
-    if not ok then return false, sprintf('expected thread, got %s', x) end
+    if not ok then return false, sprintf('expected thread, got %s [%s]', x, type(x)) end
     return true
   end
 end
@@ -33,7 +35,7 @@ function types.userdata(x)
   else
     local ok
     ok = type(x) == 'userdata'
-    if not ok then return false, sprintf('expected userdata, got %s', x) end
+    if not ok then return false, sprintf('expected userdata, got %s [%s]', x, type(x)) end
     return true
   end
 end
@@ -47,7 +49,7 @@ function types.fun(x)
   else
     local ok
     ok = type(x) == 'function'
-    if not ok then return false, sprintf('expected function, got %s', x) end
+    if not ok then return false, sprintf('expected function, got %s [%s]', x, type(x)) end
     return true
   end
 end
@@ -63,7 +65,7 @@ function types.number(x)
   else
     local ok
     ok = type(x) == 'number'
-    if not ok then return false, sprintf('expected number, got %s', x) end
+    if not ok then return false, sprintf('expected number, got %s [%s]', x, type(x)) end
     return true
   end
 end
@@ -77,7 +79,7 @@ function types.table(x)
   else
     local ok
     ok = type(x) == 'table'
-    if not ok then return false, sprintf('expected table, got %s', x) end
+    if not ok then return false, sprintf('expected table, got %s [%s]', x, type(x)) end
     return true
   end
 end
@@ -91,7 +93,7 @@ function types.string(x)
   else
     local ok
     ok = type(x) == 'string'
-    if not ok then return false, sprintf('expected string, got %s', x) end
+    if not ok then return false, sprintf('expected string, got %s [%s]', x, type(x)) end
     return true
   end
 end
@@ -105,7 +107,7 @@ function types.boolean(x)
   else
     local ok
     ok = type(x) == 'boolean'
-    if not ok then return false, sprintf('expected boolean, got %s', x) end
+    if not ok then return false, sprintf('expected boolean, got %s [%s]', x, type(x)) end
     return true
   end
 end
@@ -146,7 +148,7 @@ function types.hasmetatable(x)
   if not ok then return false, msg end
 
   local mt = getmetatable(x)
-  if not mt then return false, sprintf('expected table with metatable, got %s', x) end
+  if not mt then return false, sprintf('expected table with metatable, got %s [%s]', x, type(x)) end
 
   return true
 end
@@ -161,8 +163,8 @@ function types.pure_table(x)
     local ok, msg = types.table(x)
     if not ok then
       return false, msg
-    elseif types.has_metatable(x) then
-      return false, sprintf('expected table without metatable, got %s', x)
+    elseif types.metatable(x) then
+      return false, sprintf('expected table without metatable, got %s [%s]', x, type(x))
     else
       return true
     end
@@ -179,8 +181,8 @@ function types.pure_dict(x)
     local ok, msg = types.dict(x)
     if not ok then
       return false, msg
-    elseif types.has_metatable(x) then
-      return false, sprintf('expected dict without metatable, got %s', x)
+    elseif types.metatable(x) then
+      return false, sprintf('expected dict without metatable, got %s [%s]', x, type(x))
     else
       return true
     end
@@ -198,7 +200,7 @@ function types.pure_list(x)
     if not ok then
       return false, msg
     elseif types.hasmetatable(x) then
-      return false, sprintf('expected list without metatable, got %s', x)
+      return false, sprintf('expected list without metatable, got %s [%s]', x, type(x))
     else
       return true
     end
@@ -210,6 +212,16 @@ end
 ---@param y table
 ---@return boolean, string?
 function types.includes(x, y)
+  local ok, msg = types.table(x)
+  if not ok then
+    return false, ('x: ' .. msg)
+  end
+
+  ok, msg = types.table(y)
+  if not ok then
+    return false, ('y: ' .. msg)
+  end
+
   for key, _ in pairs(y) do
     if x[key] == nil then
       return false, sprintf('expected x to have attribute %s', key)
@@ -235,10 +247,12 @@ end
 function types.type(x)
   if class.is_object(x) then
     return x.__name
-  elseif types.pure_list(x) then
+  elseif types.pure_table(x) then
     return 'pure_list'
   elseif types.pure_dict(x) then
     return 'pure_dict'
+  elseif types.pure_table(x) then
+    return 'pure_table'
   elseif types.list(x) then
     return 'list'
   elseif types.dict(x) then
@@ -252,33 +266,24 @@ function types.type(x)
   end
 end
 
----Is value userdata
----Object precendence:
----> pure_list > pure_dict > (class >= instance >= object) > callable > list > dict > type(child)
----@param child any
----@param parent any
----@return boolean, string?
-function types.is(child, parent)
-  if child == nil and parent == nil then
-    return true
-  elseif child == parent then
-    return true
-  end
+typeof = types.type
 
-  local child_type = types.type(child)
-  local parent_type = types.type(parent)
-  local child_is_obj = child_type:match('^[A-Z]')
-  local parent_is_obj = parent_type:match('^[A-Z]')
+---@param x any
+---@return boolean
+function types.object(x)
+  return class.is_object(x, true)
+end
 
-  if child_is_obj and parent_is_obj then
-    return child:isa(parent)
-  elseif child_type == parent_type then
-    return true
-  elseif child_type == parent then
-    return true
-  else
-    return false, sprintf('Expected %s, got %s', child_type, parent_type)
-  end
+---@param x any
+---@return boolean
+function types.instance(x)
+  return class.is_instance(x, true)
+end
+
+---@param x any
+---@return boolean
+function types.class(x)
+  return class.is_class(x, true)
 end
 
 ---Does child inherit parent?
@@ -312,26 +317,133 @@ function types.optional(cond)
   end
 end
 
----Is object a union of ...?
----@param ... any
----@return fun(x: any): boolean, string?
-function types.union(...)
-  local signature = { ... }
-  return function(x)
-    local ok, msg
-    local msgs = {}
+---Is value userdata
+---Object precendence:
+---> pure_list > pure_dict > (class >= instance >= object) > callable > list > dict > type(child)
+function types.is(child, parent)
+  if child == nil and parent == nil then
+    return true
+  elseif child == parent then
+    return true
+  end
 
-    for _, sig in ipairs(signature) do
-      ok, msg = types.is(x, sig)
-      if ok then
-        return true
+  if types[parent] then
+    local ok, msg = types[parent](child)
+    if not ok then
+      return false, msg
+    else
+      return true, nil
+    end
+  elseif class.is_object(parent) then
+    if type(child) == 'table' then
+      local ok, msg = class.is_child(child, parent)
+      if not ok then
+        return false, msg
       else
-        list.append(msgs, msg)
+        return true, nil
+      end
+    else
+      return false, sprintf('expected object, got %s [table]', child)
+    end
+  elseif types.union_object(parent) then
+    return parent(child)
+  elseif callable(parent) then
+    local ok, msg = parent(child)
+    if not ok then
+      msg = msg or sprintf('assertion failure: callable[%s](%s)', parent, child)
+      return false, msg
+    end
+  elseif type(parent) == 'string' then
+    if class.is_object(child) then
+      local ok = child.__name == parent
+      if not ok then
+        return false, sprintf('expected %s, got %s [%s]', parent, child, child.__name)
+      else
+        return true, nil
       end
     end
 
-    msg = sprintf('error: \n%s', msgs)
-    return false, msg
+    local child_type = types.type(child)
+    local parent_type = types.type(parent)
+
+    if child_type == parent_type then
+      return true, nil
+    else
+      return false, sprintf('expected %s, got %s [%s]', parent_type, child, child_type)
+    end
+  end
+
+  return types.is(child, types.type(parent))
+end
+
+---Is object a union of ...?
+---@param ... any
+---@return (fun(x: any): boolean, string?)
+function types.union(...)
+  local signature = { ... }
+  local fn = bless({
+    __union = true,
+    prefix = nil,
+    signature = signature,
+    make_msg = function(self, msg)
+      local all_str = true
+      local sigs = self.signature
+
+      for i = 1, #sigs do
+        all_str = type(sigs[i]) == 'string'
+      end
+
+      if all_str then
+        self.prefix = sprintf("expected %s, got", table.concat(sigs, "|"))
+      else
+        local msgs = list.map(sigs, types.type)
+        msgs = table.concat(msgs, "|")
+        self.prefix = sprintf("expected %s, got", table.concat(msgs, "|"))
+      end
+
+      return sprintf('%s %s', self.prefix, msg)
+    end,
+  }, {
+      ---@param self table
+      ---@param x any
+      ---@return boolean, string?
+    __call = function(self, x)
+      signature = copy.copy(self.signature)
+      for i, sig in ipairs(signature) do
+        if types.union_object(sig) then
+          local ok, _ = sig(x)
+          if ok then
+            return true
+          else
+            list.remove(self.signature, i)
+            list.extend(self.signature, sig.signature)
+          end
+        elseif types.is(x, sig) then
+          return true
+        end
+      end
+
+      local msg = self:make_msg(sprintf('%s [%s]', x, types.type(x)))
+      ---@diagnostic disable-next-line
+      return false, msg
+    end,
+  })
+
+  ---@type (fun(x: any): boolean, string?)
+  return fn
+end
+
+---Is union object
+---@param x any
+---@return boolean, string?
+function types.union_object(x)
+  local ok = types.table(x)
+  if not ok then
+    return false, sprintf('expected union object, got %s [%s]', x, types.type(x))
+  elseif x.__union and x.__call then
+    return true, nil
+  else
+    return false, sprintf('expected union object, got %s [%s]', x, types.type(x))
   end
 end
 
@@ -340,21 +452,8 @@ end
 ---@param ... any
 ---@return boolean, string?
 function types.is_union_of(x, ...)
-  local ok, msg
-  local msgs = {}
-  local signature = { ... }
-
-  for _, sig in ipairs(signature) do
-    ok, msg = types.is(x, sig)
-    if ok then
-      return true
-    else
-      list.append(msgs, msg)
-    end
-  end
-
-  msg = sprintf('error: \n%s', msgs)
-  return false, msg
+  local f = types.union(...)
+  return f(x)
 end
 
 ---Is object an optional value?
@@ -370,19 +469,6 @@ function types.is_optional(x, cond)
 end
 
 types.is_opt = types.is_optional
-types.opt = types.optional
-
-function types.list_of(what)
-  return function(x, assert_)
-    return types.is_list_of(x, what, assert_)
-  end
-end
-
-function types.dict_of(what)
-  return function(x, assert_)
-    return types.is_dict_of(x, what, assert_)
-  end
-end
 
 function types.is_list_of(x, what, assert_)
   local ok, msg = types.list(x)
@@ -403,7 +489,7 @@ function types.is_list_of(x, what, assert_)
 end
 
 function types.is_dict_of(x, what, assert_)
-  local ok, msg = types.list(x)
+  local ok, msg = types.dict(x)
   if not ok then return false, msg end
 
   for key, value in pairs(x) do
@@ -418,12 +504,6 @@ function types.is_dict_of(x, what, assert_)
     end
   end
   return true
-end
-
-function types.table_of(key_f, value_f)
-  return function(x, assert_)
-    return types.is_table_of(x, key_f, value_f, assert_)
-  end
 end
 
 function types.is_table_of(x, key_f, value_f, assert_)
@@ -457,116 +537,57 @@ function types.is_table_of(x, key_f, value_f, assert_)
   return true
 end
 
----Type assertion
----usage:
----> types.assert.<prefix>(<value>, <condition (boolean)>)
----> types.assert(<value>, <condition>, <name>)
-
----Assert type of a value
----@param x any
----@param cond any
----@param name? string
-function types.assert(x, cond, name)
-  --- Stub method
-end
-
-types.assert = {}
-setmetatable(types.assert, types.assert)
-
-function types.assert:__call(x, cond, name)
-  pp { x, cond, name }
-
-  if name then
-    local ok, msg = types.string(name)
-    if not ok then error(sprintf('%s: %s', name, msg)) end
-  end
-
-  local ok, msg = types.is(x, cond)
-  if not ok then
-    msg = msg or ''
-    if name then
-      error(name .. ': ' .. msg)
-    else
-      error(msg)
-    end
-  else
-    return true
-  end
-end
-
-function types.assert:__index(name)
-  return function(x, cond)
-    return types.assert(x, cond, name)
-  end
-end
-
----Assert a value with a type condition with the error message prefixed by `name`
----@param name string
----@param x any
----@param cond any
-function types.assert.assert(name, x, cond)
-  return types.assert[name](x, cond)
-end
-
----Assert all type assertions
----@param elems table<string|number,any>
-function types.assert.all(elems)
-  for key, x in pairs(elems) do
-    local cond = x[1]
-    local value = x[2]
-    types.assert.assert(tostring(key), value, cond)
-  end
-end
-
----Assert some type assertions
----@param elems table<string|number,any>
-function types.assert.some(elems)
-  local ind = 0
-  local ks = dict.keys(elems)
-  local n = #ks
-
-  for i = 1, n do
-    local k = ks[i]
-    local x = elems[k]
-
-    if types.is(x[2], x[1]) then
-      return true
-    else
-      ind = ind + 1
-    end
-  end
-
-  if n == ind then
-    error(sprintf('Type assertions failed for: %s', list.join(ks, ', ')))
-  end
-end
-
 function types.multimethod(x)
   local ok, msg = types.object(x)
   if not ok then
     return false, msg
   end
 
-  if x.__name == 'Multimethod' then
+  if x.__name == 'multimethod' then
     return true
   end
 
   local parents = class.parents(x)
   for i = 1, #parents do
-    if parents[i] == 'Multimethod' then
+    if parents[i] == 'multimethod' then
       return true
     end
   end
 
-  return false, 'Expected Multimethod object, got ' .. dump(x)
+  return false, 'expected multimethod, got ' .. dump(x)
 end
 
-types.callable = callable
-types.has_metatable = types.hasmetatable
-types.metatable = types.has_metatable
+----Is x undefined
+---@param x any
+---@return boolean, string?
+function types.undefined(x)
+  local ok = undefined(x)
+  if not ok then
+    return false, 'expected nil, got ' .. dump(x)
+  else
+    return true
+  end
+end
 
+----Is x defined
+---@param x any
+---@return boolean, string?
+function types.defined(x)
+  local ok = undefined(x)
+  if not ok then
+    return false, 'expected non-nil, got ' .. dump(x)
+  else
+    return true
+  end
+end
+
+---Import things in global domain
 function types:import()
   _G.types = self
 end
+
+types.metatable = types.hasmetatable
+types.def = types.defined
+types.undef = types.undefined
 
 return types
