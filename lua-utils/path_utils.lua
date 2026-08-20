@@ -1,9 +1,15 @@
+require 'lua-utils.utils'
 require 'lua-utils.string'
-local path = require 'path'
 
-path.fs = require 'path.fs'
-path.info = require 'path.info'
-path.env = require 'path.env'
+local _ = require 'path'
+_.fs = require 'path.fs'
+_.info = require 'path.info'
+_.env = require 'path.env'
+
+---Common path utilities
+---When called with arguments, join arguments with '/' and return the path
+---@overload fun(...: string): string
+local path = defmodule 'path'
 
 ---Similar to fs.glob but returns a list instead
 ---@param pattern string
@@ -11,18 +17,20 @@ path.env = require 'path.env'
 function path.glob(pattern)
   local files = {}
 
-  for filename, _ in path.fs.glob(pattern) do
+  for filename, _ in _.fs.glob(pattern) do
     files[#files + 1] = filename
   end
 
   return files
 end
 
+glob = path.glob
+
 ---Split path by system separator string
 ---@param filename string
 ---@return string[]
 function path.split(filename)
-  local sep = path.root()
+  local sep = _.root(filename)
   local ps = {}
 
   if sep == '\\' then
@@ -46,6 +54,9 @@ function path.extension(filename)
   end
 end
 
+path.get_ext = path.extension
+path.get_extension = path.extension
+
 ---Remove the extension and return the file basename
 ---@param filename string
 ---@return string?
@@ -59,23 +70,27 @@ function path.no_extension(filename)
   end
 end
 
----@class ls_context
+path.get_ext = path.extension
+path.ext = path.extension
+path.no_ext = path.no_extension
+
+---@class path.ls.args
 ---@field parent string
 ---@field path string
 ---@field extension string
 ---@field type string
 ---@field basename string
 
----@class ls_options
+---@class path.ls.opts
 ---@field depth? number (default: -1) When depth is a negative number, go all the way
----@field stop_when? fun(context: ls_context): boolean Stop when the condition is true and return everything collected till then
----@field map? fun(context: ls_context) Apply this function to matched files and use the returning value
+---@field stop_when? fun(context: path.ls.args): boolean Stop when the condition is true and return everything collected till then
+---@field map? fun(context: path.ls.args) Apply this function to matched files and use the returning value
 ---@field include? string (default: .*) Include only these files in the result
 ---@field include_dir? string (default: .*) Include only these directories while traversing
 
 ---List files recursively
 ---@param dirname string
----@param opts? ls_options
+---@param opts? path.ls.opts
 ---@return string[]
 function path.ls(dirname, opts)
   local function create_context(filename, filetype)
@@ -106,7 +121,7 @@ function path.ls(dirname, opts)
     include_dir = include_dir or '.*'
     local next_dirs = {}
 
-    for filename, filetype in path.fs.dir(d) do
+    for filename, filetype in _.fs.dir(d) do
       if filetype == 'dir' and filename:match(include_dir) then
         next_dirs[#next_dirs + 1] = filename
       elseif stop_when and stop_when(create_context(filename, filetype)) then
@@ -132,7 +147,7 @@ function path.ls(dirname, opts)
   end
 
   opts = opts or {}
-  dirname = path.abspath(dirname)
+  dirname = _.abs(dirname)
   local depth = opts.depth or 1
   local stop_when = opts.stop_when
   local include = opts.include
@@ -189,6 +204,8 @@ function path.search_parents(dirname, markers, depth, _current_depth)
   )
 end
 
+path.searchb = path.search_parents
+
 ---List files of a particular type
 ---@param dirname string
 ---@param filetype string required filetype
@@ -196,7 +213,7 @@ function path.ls_type(dirname, filetype)
   dirname = path.abspath(dirname)
   local res = {}
 
-  for filename, ft in path.fs.dir(dirname) do
+  for filename, ft in _.fs.dir(dirname) do
     if ft == filetype then
       res[#res + 1] = filename
     end
@@ -251,7 +268,7 @@ function path.search_children(dirname, markers, depth, _current_depth)
     return
   end
 
-  for filename, filetype in path.fs.dir(dirname) do
+  for filename, filetype in _.fs.dir(dirname) do
     local basename = path.basename(filename)
     for i = 1, #markers do
       if basename == markers[i] then
@@ -272,6 +289,8 @@ function path.search_children(dirname, markers, depth, _current_depth)
     end
   end
 end
+
+path.searchf = path.search_children
 
 ---Check if directory is a git directory
 ---@param dirname string
@@ -309,39 +328,94 @@ function path.git_dirs(dirname, depth)
   return res
 end
 
-path.abspath = path.abs
-path.no_ext = path.no_extension
-path.ext = path.extension
-path.cd = path.fs.chdir
-path.chdir = path.fs.chdir
-path.fs.cd = path.cd
-path.dirname = path.parent
-path.basename = path.name
-path.is_dir = path.isdir
-path.is_file = path.isfile
-path.is_link = path.islink
-path.is_mount = path.ismount
-path.fs.is_dir = path.isdir
-path.fs.is_file = path.isfile
-path.fs.is_link = path.islink
-path.fs.is_mount = path.ismount
-path.fs.is_git_dir = path.is_git_dir
-path.fs.search_parents = path.search_parents
-path.fs.search_children = path.search_children
-path.fs.searchf = path.fs.search_children
-path.fs.searchb = path.fs.search_parents
-path.searchf = path.fs.searchf
-path.searchb = path.fs.searchb
-path.fs.ls_dir = path.ls_dir
-path.fs.ls_file = path.ls_file
-path.fs.ls_mount = path.ls_mount
-path.fs.ls_link = path.ls_link
-path.fs.ls = path.ls
-path.getcwd = path.cwd
-path.fs.rm_r = path.fs.removedirs
-path.fs.rm = path.fs.remove
-path.fs.cp = path.fs.copy
-path.fs.ln = path.fs.symlink
-basename = path.name
+path.get_git_dirs = path.git_dirs
+
+---Create a path
+---@param ... string
+---@return string
+function path:__call(...)
+  return table.concat({ ... }, '/')
+end
+
+---Get absolute path
+---@overload fun(file: string): string
+path.get_abspath = _.abspath
+path.abspath = path.get_abspath
+abspath = path.abspath
+
+---Get current working directory
+---@overload fun(): string
+path.get_cwd = _.cwd
+path.getcwd = path.get_cwd
+getcwd = path.getcwd
+
+---Get directory name of the path
+---@overload fun(file: string): string
+path.get_dirname = _.parent
+path.dirname = path.get_dirname
+dirname = path.dirname
+
+---Get basename of path
+---@overload fun(file: string): string
+path.get_basename = _.name
+path.basename = path.get_basename
+basename = path.basename
+
+---Get directory name of the path
+---@overload fun(file: string): string
+path.get_dirname = _.parent
+path.dirname = path.get_dirname
+dirname = path.dirname
+
+---Cd into directory
+---@overload fun(file: string)
+path.cd = _.fs.chdir
+path.chdir = path.cd
+
+---Check if path is a directory
+---@overload fun(file: string): boolean
+path.is_dir = _.isdir
+is_dir = path.is_dir
+
+---Check if path is a file
+---@overload fun(file: string): boolean
+path.is_file = _.isfile
+is_file = path.is_file
+
+---Check if path is a symlink
+---@overload fun(file: string): boolean
+path.is_link = _.islink
+is_link = path.is_link
+
+---Check if path is a mount point
+---@overload fun(file: string): boolean
+path.is_mount = _.ismount
+is_mount = path.is_mount
+
+---Recursively remove directories
+---@overload fun(file: string)
+path.rm_r = _.fs.removedirs
+path.rm_dir = path.rm_r
+path.rmdir = path.rm_dir
+
+---Remove non-directory
+---@overload fun(file: string)
+path.rm = _.fs.remove
+
+---Copy path
+---@overload fun(src: string, dst: string)
+path.cp = _.fs.copy
+
+---Symlink path
+---@overload fun(src: string, dst: string)
+path.ln = _.fs.symlink
+path.symlink = path.ln
+symlink = symlink
+
+---Get environment variable
+---@overload fun(env: string): string?
+path.get_env = _.env.get
+path.getenv = path.get_env
+getenv = path.getenv
 
 return path

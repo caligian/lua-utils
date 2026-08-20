@@ -1,5 +1,6 @@
 ---@overload fun(x: table, deep?: boolean): table
 local copy = {}
+copy.__index = rawget
 setmetatable(copy, copy)
 
 ---Shallow copy table
@@ -24,11 +25,12 @@ end
 ---Deep copy table
 ---@param x table src table
 ---@param res? table dest table
+---@param cache? table Optional table containing caches
 ---@return table
-function copy.deep(x, res)
+function copy.deep(x, res, cache)
   local mt = getmetatable(x)
   res = res or {}
-  local cache = {}
+  cache = cache or {}
   cache[x] = true
 
   for key, value in pairs(x) do
@@ -38,7 +40,7 @@ function copy.deep(x, res)
       else
         res[key] = {}
         cache[value] = true
-        copy.deep(value, res[key])
+        copy.deep(value, res[key], cache)
       end
     else
       res[key] = value
@@ -52,16 +54,16 @@ function copy.deep(x, res)
   return res
 end
 
+---Copy table
+---@param x table
+---@param deep? boolean
+---@return table
 function copy:__call(x, deep)
   if deep then
     return copy.deep(x)
   else
     return copy.copy(x)
   end
-end
-
-function copy:import()
-  _G.copy = self
 end
 
 return copy

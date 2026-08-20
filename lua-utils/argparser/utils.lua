@@ -1,7 +1,8 @@
 require "lua-utils.string"
+
+local is = require 'lua-utils.is'
 local list = require "lua-utils.list"
 local types = require 'lua-utils.types'
-local sys = require 'system'
 local utils = {}
 
 function utils.print_and_exit(msg, ...)
@@ -10,14 +11,24 @@ function utils.print_and_exit(msg, ...)
 end
 
 function utils.get_term_width(default)
-  default = default or 50
-  local nrow, ncol = sys.termsize()
-  if nrow == nil then
-    return default
+  local fh = io.popen('tput cols 2>/dev/null')
+  if not fh then
+    return default or 72
+  end
+
+  local out = fh:read('*a')
+  fh:close()
+
+  if #out == 0 then
+    return default or 72
   else
-    return ncol
+    out = string.match(out, '(%d+)')
+    return tonumber(out)
   end
 end
+
+pp(utils.get_term_width())
+pp(os.getenv("COLUMNS"))
 
 function utils.format_metavar(metavar, nargs)
   metavar = metavar or 'ARGUMENT'
@@ -81,10 +92,10 @@ function utils.assert(name, args, assertion)
   return true
 end
 
-function utils.create_help(header, help, maxwidth)
+function utils.make_help(header, help, maxwidth)
   maxwidth = maxwidth or utils.get_term_width(72)
   local midpoint = math.ceil(maxwidth / 2) - 3
-  midpoint = ifelse(midpoint < 20, 20, midpoint)
+  midpoint = midpoint < 20 and 20 or midpoint
   local header_len = #header
   help = string.split(help, "%s+")
   help = list.filter(help, function (x)

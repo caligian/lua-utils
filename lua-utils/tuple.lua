@@ -1,7 +1,7 @@
 local _ = require 'lua-utils._'
 
 ---These functions are potentially performance intensive. Use with care
----@overload fun(missing: any, ...): []any
+---@overload fun(missing: any, ...): any[]
 local tuple = {}
 
 tuple.__index = tuple
@@ -41,14 +41,14 @@ end
 
 ---Similar to lisp's cdr for variadic arguments
 ---@param missing any A non-nil value
----@return []any
+---@return any[]
 function tuple.cdr(missing, ...)
   return tuple.pack(missing, select(2, ...))
 end
 
 ---@param missing any A non-nil value
 ---@param n number index
----@param ...
+---@param ... any
 ---@return any
 function tuple.nth(missing, n, ...)
   local args = tuple.pack(missing, ...)
@@ -86,7 +86,7 @@ end
 
 ---@param opts tuple_slice_opts
 ---@param ... any
----@return []any
+---@return ...
 function tuple.slice(opts, ...)
   opts = opts or {}
   local missing = (opts.missing == nil and false) or opts.missing

@@ -161,9 +161,16 @@ function string.title(x)
   return table.concat(words, " ")
 end
 
+---@param s string
+---@param pattern string
+---@param init? number
+---@param plain? boolean
+---@return number?, number?
 function string.contains(s, pattern, init, plain)
   plain = (plain == nil and true) or plain
   return string.find(s, pattern, init, true)
 end
+
+strfmt = string.format
 
 return string

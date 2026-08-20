@@ -1,10 +1,9 @@
 require 'lua-utils.utils'
 require 'lua-utils.string'
 
-local class = require 'lua-utils.class'
 local copy = require 'lua-utils.copy'
-
 local process = {}
+
 process.Popen = class 'Popen'
 
 ---@class Popen
@@ -159,7 +158,7 @@ function process.check_output(cmd, f)
   return res
 end
 
----@class systemOpts
+---@class process.system.opts
 ---@field stdout? boolean (default: false)
 ---@field capture? boolean (default: false)
 ---@field newlines? boolean (default: true)
@@ -167,7 +166,7 @@ end
 
 ---Run a system command and optionally capture output
 ---@param cmd string
----@param opts? systemOpts
+---@param opts? process.system.opts
 function process.system(cmd, opts)
   opts = opts or {}
   local capture = opts.stdout or opts.capture
@@ -191,7 +190,7 @@ function process.system(cmd, opts)
 end
 
 ---@param cmd string
----@param opts?
+---@param opts? process.system.opts
 function process.systemlist(cmd, opts)
   opts = opts or {}
   opts = copy.copy(opts)

@@ -1,14 +1,20 @@
 local _ = require 'lua-utils._'
-require 'lua-utils.metatable'
-require 'lua-utils.dump'
 local tuple = require('lua-utils.tuple')
 
 unpack = unpack or table.unpack
 
+---@class BlessedTable
+---@field __index table
+
+---@class CallableTable
+---@field __call table|function
+
+---@alias Callable CallableTable|function
 ---@alias Filter fun(...): boolean?
----@alias Mapper fun(...): any
----@alias Condition boolean | Filter | nil
----@alias Callback fun(): any
+---@alias Condition boolean | fun(...): boolean, string?
+---@alias Map fun(...): any
+---@alias Fun fun(...): ...
+---@alias PcallFun fun(...): boolean, any
 
 ---Anything other than nil and false are truthy values.
 ---No more 0 and 1 shenanigans
@@ -34,113 +40,11 @@ function is_falsy(x)
   end
 end
 
----@param x any
----@param f fun(...): any
----@param ... any
----@return boolean, any
-function when_truthy(x, f, ...)
-  if x ~= nil and x ~= false then
-    return true, f(...)
-  else
-    return false, nil
-  end
-end
-
----@param x any
----@param f fun(...): any
----@param ... any
----@return boolean, any
-function when_falsy(x, f, ...)
-  if x == nil or x == false then
-    return true, f(...)
-  else
-    return false, nil
-  end
-end
-
----Similar to python's callable()
----@param x any
----@param err_msg? boolean
----@return boolean, string?
----@overload fun(x: any): boolean, nil
----@overload fun(x: any, err_msg: boolean): boolean, string
-function callable(x, err_msg)
-  local type_ = type(x)
-  if type_ == 'function' then
-    return true, nil
-  elseif type_ ~= 'table' then
-    if err_msg then
-      return false, 'x: Expected with table with __call metamethod'
-    else
-      return false, nil
-    end
-  end
-
-  local mt = getmetatable(x)
-  if not mt then
-    if err_msg then
-      return false, 'x: Expected table with metamethod'
-    else
-      return false, nil
-    end
-  elseif mt.__call then
-    return callable(mt.__call)
-  else
-    return false, "x: No __call metamethod defined"
-  end
-end
-
 ---@param value any
 ---@return (fun(): any)
 function literal(value)
   return function() return value end
 end
-
----Inverse functional version of if-else
----@param cond boolean
----@param ok any
----@param err? any
----@return any
----@overload fun(cond: Condition): boolean
-function unless(cond, ok, err)
-  local use
-  if callable(cond) then
-    use = cond()
-  else
-    use = cond
-  end
-
-  return when(not use, ok, err)
-end
-
----Functional version of if-else
----@param cond Condition
----@param ok? Callback
----@param err? Callback
----@return any
----@overload fun(cond: Condition): boolean
-function when(cond, ok, err)
-  local use
-  if callable(cond) then
-    use = cond()
-  else
-    use = cond
-  end
-
-  if use then
-    if ok then
-      return ok()
-    else
-      return true
-    end
-  elseif err then
-    return err()
-  else
-    return false
-  end
-end
-
-apply = bless {}
 
 ---Call a function with arguments (with pcall optionally)
 ---Do not return more than 2 arguments, variadic returns other than 2 can cause chaos
@@ -148,8 +52,8 @@ apply = bless {}
 ---@param args any[]
 ---@param should_pcall? boolean (default: false)
 ---@return boolean, any
----@overload fun(f: function, args: []any, should_pcall: true): boolean, any
----@overload fun(f: function, args: []any, should_pcall: false): ...
+---@overload fun(f: function, args: any[], should_pcall: true): boolean, any
+---@overload fun(f: function, args: any[], should_pcall: false): ...
 function apply(f, args, should_pcall)
   if should_pcall then
     local ok, msg = pcall(f, unpack(args))
@@ -174,11 +78,11 @@ function partial(default, f, ...)
   local outer_args = tuple.pack(default, ...)
   return function(...)
     local inner = tuple.pack(default, ...)
-    local outer = {unpack(outer_args)}
+    local outer = { unpack(outer_args) }
     local len = #outer
 
-    for i=1, #inner do
-      outer[len+1] = inner[i]
+    for i = 1, #inner do
+      outer[len + 1] = inner[i]
       len = len + 1
     end
 
@@ -197,18 +101,17 @@ function rpartial(default, f, ...)
   local outer_args = tuple.pack(default, ...)
   return function(...)
     local inner = tuple.pack(default, ...)
-    local outer = {unpack(outer_args)}
+    local outer = { unpack(outer_args) }
     local len = #inner
 
-    for i=1, #outer do
-      inner[len+1] = outer[i]
+    for i = 1, #outer do
+      inner[len + 1] = outer[i]
       len = len + 1
     end
 
     return f(unpack(inner))
   end
 end
-
 
 ---Return argument as is
 ---@param x any
@@ -224,26 +127,20 @@ setmetatable(thread, thread)
 
 function thread:__call(obj, ...)
   local res = obj
-  local mappers = {...}
+  local mappers = { ... }
 
   if #mappers == 0 then
     return true, res
   end
 
-  for i=1, #mappers do
-    local result = {mappers[i](res)}
-    local result_len = #result
-    local ok, msg
+  for i = 1, #mappers do
+    local f = mappers[i]
+    assert(callable(f), string.format("...[%d]: Expected callable, got " .. type(f)))
 
-    if result_len > 2 then
-      errorf("%s: Expected <= 2 return values, got %d", tostring(mappers[i]), result_len)
-    elseif #result == 1 then
-      ok = is_truthy(result[1])
-      msg = ((not ok) and sprintf('%s: Function returned a falsy value', tostring(result[1]))) or result[1]
-    else
-      ok, msg = unpack(result)
-    end
+    local result = { f(res) }
+    assert(#result == 2, string.format("...[%d]: Callable must return 2 values"))
 
+    local ok, msg = unpack(result)
     if not ok then
       return false, msg
     else
@@ -260,14 +157,17 @@ end
 ---@return boolean, any
 function thread.pcall(obj, ...)
   local res = obj
-  local mappers = {...}
+  local mappers = { ... }
 
   if #mappers == 0 then
     return true, res
   end
 
-  for i=1, #mappers do
-    local ok, msg = pcall(mappers[i], res)
+  for i = 1, #mappers do
+    local f = mappers[i]
+    assert(callable(f), string.format("...[%d]: Expected callable, got " .. type(f)))
+
+    local ok, msg = pcall(f, res)
     if not ok then
       return false, msg
     else
@@ -350,9 +250,9 @@ function readlines(filename)
 end
 
 ---Similar to spit but writes list of strings separated by newline
----@param lines []string
+---@param lines string[]
 ---@param filename string
----@param newline? boolean (default: true) Add newline at the end of every line? 
+---@param newline? boolean (default: true) Add newline at the end of every line?
 ---@return number?
 function writelines(lines, filename, newline)
   newline = (newline == nil and true) or newline
@@ -421,52 +321,15 @@ function undefined(x, ok, ...)
 end
 
 ---@param x any
----@param ok? (fun(x): any)
----@param ... any Arguments to pass when x is defined and cond is a function
----@return any
----@overload fun(x: any): boolean
----@overload fun(x: any, ok: (fun(...): any), ...): any
-function defined(x, ok, ...)
-  if x ~= nil then
-    if ok ~= nil then
-      return _.cond(ok, ...)
-    else
-      return true
-    end
-  else
-    return false
-  end
+---@return boolean
+function defined(x)
+  return x ~= nil
 end
 
----@class ifelse_opts
----@field ok? []any
----@field err? []any
----@field ok_args? []any
----@field err_args? []any
-
----@param cond? Condition
----@param true_fn? (fun(x): any)
----@param false_fn? (fun(x): any)
----@param opts? ifelse_opts
----@return any
----@overload fun(x: any): boolean
-function when(cond, true_fn, false_fn, opts)
-  opts = opts or {}
-  local ok_args = opts.ok or opts.ok_args or {}
-  local err_args = opts.err or opts.err_args or {}
-  local ok = _.cond(cond)
-
-  if not ok then
-    if false_fn then
-      return false_fn(unpack(err_args))
-    else
-      return false
-    end
-  elseif true_fn then
-    return true_fn(unpack(ok_args))
-  else
-    return true
-  end
+---@param x any
+---@return boolean
+function undefined(x)
+  return x == nil
 end
 
 ---@param value any
@@ -480,80 +343,8 @@ function invert(x)
   return not x
 end
 
----For equality checks - to eliminate the nonsense of operators
-equals = bless {}
-
----@param x any
----@param y any
----@return boolean
-function equals.equals(x, y)
-  return x == y
-end
-
----@param x any
----@param y any
----@return boolean
-function equals.invert(x, y)
-  return invert(equals(x, y))
-end
-
-function equals:__call(x, y, invert)
-  if invert then
-    return equals.equals(x, y)
-  else
-    return equals.invert(x, y)
-  end
-end
-
----@param x any
----@param expected_types []string
----@return boolean?
-function assert_type(x, expected_types)
-  local x_type = _.type(type(x))
-  x_type = x_type == nil and 'nil' or x_type
-
-  for _, expected in ipairs(expected_args) do
-    if x_type ~= expected then
-      local exp_type = expected == nil and 'nil' or expected
-      error(string.format('x: Expected %s, got %s', exp_type, x_type))
-    else
-      return true
-    end
-  end
-
-  return false
-end
-
----@param cond Condition
----@param fmt string
----@param ... string
-function assert_when(cond, fmt, ...)
-  local ok
-  if callable(cond) then
-    ok = cond()
-  else
-    ok = cond
-  end
-
-  if not ok then
-    errorf(fmt, ...)
-  else
-    return true
-  end
-end
-
-function assert_unless(cond, fmt, ...)
-  local ok
-  if callable(cond) then
-    ok = cond()
-  else
-    ok = cond
-  end
-  return assert_when(not ok, fmt, ...)
-end
-
 ---Get the actual size of tables or get string length
----@return param x string|table
+---@param x string|table
 ---@return number
 function size(x)
   local x_type = type(x)
@@ -572,14 +363,26 @@ function size(x)
 end
 
 ---Get the actual size of tables or get string length
----@return param x string|table
+---@param x string|table
 ---@return number
 function length(x)
-  if x ~= 'table' and x ~= 'string' then
-    errorf('x: Expected string|table, got %s', x)
+  local x_type = type(x)
+  if x_type ~= 'string' and x_type ~= 'table' then
+    errorf("Expected string|table, got [%s] %s", type(x), inspect(x))
   end
 
-  return #x
+  if x_type == 'string' or is_pure_list(x) then
+    return #x
+  elseif x.__length then
+    return x:__length()
+  end
+
+  local n = 0
+  for _, _ in pairs(x) do
+    n = n + 1
+  end
+
+  return n
 end
 
 ---For hybrid dict+list tables, this will check the dict size, beware!
@@ -590,12 +393,14 @@ function is_empty(x)
     return #x == 0
   end
 
-  local size = 0
-  for _, _ in pairs(x) do
-    size = size + 1
-  end
+  return length(x) == 0
+end
 
-  return size
+---For hybrid dict+list tables, this will check the dict size, beware!
+---@param x string|table
+---@return boolean
+function is_not_empty(x)
+  return not is_empty(x)
 end
 
 ---@param x string|table
@@ -605,8 +410,5 @@ function has_values(x)
 end
 
 L = literal
-when_nil = undefined
-unless_nil = defined
-unless_truthy = when_falsy
-unless_falsy = when_truthy
-is_not_empty = has_values
+
+require 'lua-utils.metatable'

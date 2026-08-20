@@ -11,10 +11,11 @@ end
 
 ---Return boolean or falsey value returned by a function
 ---@param cond? boolean | (fun(...): boolean?)
+---@param ... any
 ---@return boolean
 ---@overload fun(cond?: boolean): boolean?
 ---@overload fun(cond: (fun(...): boolean), ...): boolean?
-function _.cond(cond)
+function _.cond(cond, ...)
   if cond == nil then
     return false
   end
@@ -23,9 +24,9 @@ function _.cond(cond)
   if cond_type == 'boolean' then
     return cond
   elseif cond_type == 'function' then
-    return cond()
+    return cond(...)
   else
-    error('cond: Expected nil | boolean | (fun(): boolean?), got ' .. _.type(cond_type))
+    error('cond: Expected nil | boolean | (fun(...): boolean?), got ' .. _.type(cond_type))
   end
 end
 
@@ -158,6 +159,5 @@ function _.fix_index(tbl_len_or_tbl, index, strict, fix_bounds)
   index = index < 0 and (index + tbl_len) or index
   return throw(index, tbl_len)
 end
-
 
 return _

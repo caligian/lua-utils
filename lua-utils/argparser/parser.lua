@@ -320,7 +320,7 @@ function Argparser:parse(args, maxwidth)
     if kw.times_passed > 0 then
       kwargs[name] = kw.args
     elseif kw.default then
-      kwargs[name] = totable(kw.default())
+      kwargs[name] = as_list(kw.default())
     end
   end
 

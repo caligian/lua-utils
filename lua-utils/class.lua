@@ -1,153 +1,25 @@
-require 'lua-utils.metatable'
-require 'lua-utils.utils'
-
 local list = require 'lua-utils.list'
-local copy = require 'lua-utils.copy'
 
----@class class.shape
----@field __attributes table<string,boolean> All class attributes set
----@field __methods table<string,boolean> All class methods set
----@field __metamethods table<string,boolean> All class metamatehods set
----@field __metaattributes table<string,boolean> All class metaattributes (variables starting with '__')
----@field __object boolean Always true for classes and instances
----@field __instance boolean Always true for instances and false otherwise
----@field __inherits? class.shape class to inherit from
----@field __name string class name
-
----@class instance.shape : class.shape
----@field __class class.shape Underlying class
-
----@alias object.shape class.shape | instance.shape
+---@generic T
 
 ---Create classes and instances
----@overload fun(name: string, inherits?: table, ...: any): class.shape
-class = {}
-
-setmetatable(class, class)
-
----Is table an object
----@param obj table
----@param msg? boolean
----@return boolean, string?
-function class.is_object(obj, msg)
-  if type(obj) ~= 'table' then
-    if msg then
-      return false, ('Expected table, got ' .. dump(obj))
-    else
-      return false
-    end
-  elseif not obj.__object then
-    if msg then
-      return false, ('Expected object, got ' .. dump(obj))
-    else
-      return false
-    end
-  else
-    return true
-  end
-end
-
----Is table an instance
----@param obj table
----@return boolean, string?
-function class.is_instance(obj)
-  if type(obj) ~= 'table' then
-    return false, ('Expected table, got ' .. dump(obj))
-  elseif not obj.__object then
-    return false, ('Expected object, got ' .. dump(obj))
-  elseif not obj.__instance then
-    return false, ('Expected instance, got class: ' .. dump(obj))
-  else
-    return true
-  end
-end
-
----Is table an class?
----@param obj table
----@param msg? boolean
----@return boolean, string?
-function class.is_class(obj, msg)
-  if type(obj) ~= 'table' then
-    if msg then
-      return false, ('Expected table, got ' .. dump(obj))
-    else
-      return false
-    end
-  elseif not obj.__object then
-    if msg then
-      return false, ('Expected object, got ' .. dump(obj))
-    else
-      return false
-    end
-  elseif obj.__instance then
-    if msg then
-      return false, ('Expected class, got instance: ' .. dump(obj))
-    else
-      return false
-    end
-  else
-    return true
-  end
-end
-
----Does object inherit class?
----@param obj object
----@param cls object
----@return boolean
-function class.inherits(obj, cls)
-  assert(class.is_object(obj))
-  assert(class.is_object(cls))
-
-  cls = cls.__instance and cls.__class or cls
-  obj = obj.__instance and obj.__class or obj
-
-  if obj == cls then
-    return true
-  end
-
-  local parent = obj.__inherits
-  while true do
-    if not parent then
-      return false
-    elseif parent == cls then
-      return true
-    else
-      parent = parent.__inherits
-    end
-  end
-end
-
----Is class parent of obj?
----@param cls object
----@param obj object
----@return boolean
-function class.is_parent_of(cls, obj)
-  return class.inherits(obj, cls)
-end
-
----Is class child of obj?
----@param obj object
----@param cls object
----@return boolean
-function class.is_child_of(obj, cls)
-  return class.inherits(obj, cls)
-end
-
-class.is_parent = class.is_parent_of
-class.is_child = class.is_child_of
-
----Clone object
----@param x object
----@param deep? boolean deep clone object?
----@return object
-function class.copy(x, deep)
-  return copy(x, deep)
-end
+---@overload fun(name: string, inherits?: class, defaults?: table<string|number,any>): table
+class = bless {
+  __type = 'callable',
+  __name = 'class'
+}
+class.__index = class
+class.is_object = is_object
+class.is_class = is_class
+class.is_instance = is_instance
+class.inherits = inherits
+class.instanceof = instanceof
+class.get_name = class_name
 
 ---Get object or its descendant's initialize
----@param obj object
+---@param obj instance
 ---@param ... any additional args
-function class.super(obj, ...)
+function class.initialize(obj, ...)
   local function find_init(x)
     if x.__instance then
       x = x.__class
@@ -174,49 +46,50 @@ end
 ---Get object methods
 ---@param x object
 ---@return table<string,function | table>
-function class.methods(x)
+function class.get_methods(x)
   local res = {}
   for key, _ in pairs(x.__methods) do
     res[key] = x[key]
   end
-
   return res
 end
 
 ---Get object attributes which are not methods
 ---@param x object
 ---@return table<string,any>
-function class.attributes(x)
+function class.get_attributes(x)
   local res = {}
   for key, _ in pairs(x.__attributes) do
     res[key] = x[key]
   end
-
   return res
 end
 
 ---Get object attribute which is not a method
----@param x object
+---@param x table
 ---@param attrib string
 ---@return any
-function class.attribute(x, attrib)
-  local value = x.__attributes[attrib]
-  return ifelse(value, x[attrib])
+function class.get_attribute(x, attrib)
+  if x.__attributes[attrib] then
+    return x[attrib]
+  end
 end
 
 ---Get object method
----@param x object
+---@param x table
 ---@param method string
----@return function | table
-function class.method(x, method)
-  local value = x.__methods[method]
-  return ifelse(value, x[method])
+---@return function?
+function class.get_method(x, method)
+  local fn = x.__methods[method]
+  if fn then
+    return x[method]
+  end
 end
 
 ---Get object metamethods
----@param x object
+---@param x table
 ---@return table<string,function | table>
-function class.metamethods(x)
+function class.get_metamethods(x)
   local res = {}
   for key, _ in pairs(x.__metamethods) do
     res[key] = x[key]
@@ -225,9 +98,9 @@ function class.metamethods(x)
 end
 
 ---Get object metaattributes
----@param x object
+---@param x table
 ---@return table<string,any>
-function class.metaattributes(x)
+function class.get_metaattributes(x)
   local res = {}
   for key, _ in pairs(x.__metaattributes) do
     res[key] = x[key]
@@ -236,7 +109,7 @@ function class.metaattributes(x)
 end
 
 ---Merge attributes and methods from table
----@param x object
+---@param x table
 ---@param from table
 ---@return table
 function class.include(x, from)
@@ -247,16 +120,8 @@ function class.include(x, from)
   return x
 end
 
----Create a new class
----@param name string
----@param inherits? table
----@return table
-function class.new(name, inherits)
-  return class(name, inherits)
-end
-
 ---Get object's class or return the object if it is a class
----@param x object
+---@param x table
 ---@return table?
 function class.get_class(x)
   if not class.is_object(x) then
@@ -269,32 +134,38 @@ function class.get_class(x)
 end
 
 ---Set object attribute
----@param x object
+---@param x table
 ---@param key string
 ---@param value any
 function class.set(x, key, value)
-  if class.is_object(value) or not callable(value) then
-    if tostring(key):match '^__' then
-      x.__metaattributes[key] = true
-    else
-      x.__attributes[key] = true
-    end
-  else
-    if tostring(key):match '^__' then
-      x.__metamethods[key] = true
-    else
-      x.__methods[key] = true
-    end
-  end
+  local is_meta = key:match '^__'
+  local is_method = callable(value)
+  local is_metamethod = is_meta and is_method
+  local is_metaattrib = is_meta and not is_method
+  local is_attrib = not is_method
 
   rawset(x, key, value)
+  local store
+
+  if is_metamethod then
+    store = x.__metamethods
+  elseif is_metaattrib then
+    store = x.__metaattributes
+  elseif is_attrib then
+    store = x.__attributes
+  elseif is_method then
+    store = x.__methods
+  end
+
+  store[key] = true
+  return x
 end
 
 ---Create a partial instance method with the object as the first argument
----@param x object
+---@param x table
 ---@param method string
 ---@return function?
-function class.create_instance_method(x, method)
+function class.make_instance_method(x, method)
   if not x[method] then
     return nil
   else
@@ -304,61 +175,19 @@ function class.create_instance_method(x, method)
   end
 end
 
----Create an instance of the object
----@param cls class
----@param defaults table<string,any>
----@param ... any initialize arguments
----@return instance
-function class.create_instance(cls, defaults, ...)
-  cls = class.get_class(cls)
-  local obj = {
-    __metaattributes = cls.__metaattributes,
-    __metamethods = cls.__attributes,
-    __attributes = cls.__attributes,
-    __methods = cls.__attributes,
-  }
-  setmetatable(obj, obj)
-
-  obj.__newindex = class.set
-  obj.__object = true
-  obj.__name = cls.__name
-  obj.__inherits = cls.__inherits
-  obj.__instance = true
-  obj.__class = cls
-  obj.__index = cls
-
-  if defaults then
-    for key, value in pairs(defaults) do
-      obj[key] = value
-    end
-  end
-
-  if cls.initialize then
-    cls.initialize(obj, ...)
-  else
-    class.super(obj, ...)
-  end
-
-  function cls.is(obj_)
-    return cls:isa(obj_)
-  end
-
-  return obj
-end
-
 ---Get object parents
----@param obj object
----@return class[]?
+---@param obj table
+---@return table[]?
 function class.get_parents(obj)
   assert(class.is_object(obj))
 
   obj = class.get_class(obj)
   local parents = {}
 
-  if not obj.__inherits then
+  if not obj.__class then
     return
   else
-    parents[#parents + 1] = obj.__inherits
+    parents[#parents + 1] = obj.__class
   end
 
   local parent = parents[1]
@@ -375,91 +204,154 @@ function class.get_parents(obj)
   return parents
 end
 
-function class:__call(name, inherits, defaults)
-  assert(type(name) == 'string', 'name: Expected string, got ' .. dump(name))
-  if inherits then
-    local ok, msg = class.is_object(inherits)
-    if not ok then
-      msg = 'inherits: ' .. msg
-      error(msg)
-    else
-      inherits = class.get_class(inherits)
+---Create an instance of the object
+---@param cls table
+---@param ... any initialize arguments
+---@return instance
+function class.make_instance(cls, ...)
+  cls = class.get_class(cls) or cls
+  local obj = {
+    __attributes = {},
+    __methods = {},
+    __metamethods = {},
+    __metaattributes = {
+      __metaattributes = true,
+      __metamethods = true,
+      __attributes = true,
+      __methods = true,
+    },
+  }
+
+  setmetatable(obj, cls)
+
+  for key, value in pairs(cls) do
+    obj[key] = value
+  end
+
+  obj.__call = nil
+  obj.__instance = true
+  obj.__class = cls
+  obj.__index = cls
+
+  if cls.initialize then
+    cls.initialize(obj, ...)
+  else
+    class.initialize(obj, ...)
+  end
+
+  return obj
+end
+
+---@param name string
+---@param parent class
+---@param defaults? table<string|number,any>
+---@return class
+function class.make_class(name, parent, defaults)
+  is.string(name, { assert = true, prefix = 'name' })
+  is.class(parent, { assert = true, opt = true, prefix = 'parent' })
+  is.table(defaults, { assert = true, opt = true, prefix = 'defaults' })
+
+  local function copy_attribs(attrib, cls, p)
+    local parent_attribs = p[attrib]
+    for key, value in pairs(parent_attribs) do
+      rawset(cls[attrib], key, value)
     end
   end
 
-  if defaults then
-    assert(type(defaults), 'defaults: Expected a table, got ' .. dump(defaults))
-  end
+  local skip = {
+    __metaattributes = true,
+    __metamethods = true,
+    __attributes = true,
+    __methods = true,
+  }
 
   local cls = {
     __attributes = {},
     __methods = {},
-    __metaattributes = { __metaattributes = true, __metamethods = true },
     __metamethods = {},
+    __metaattributes = {
+      __metaattributes = true,
+      __metamethods = true,
+      __attributes = true,
+      __methods = true,
+    },
   }
 
-  setmetatable(cls, cls)
+  cls = cls
 
-  cls.__newindex = class.set
-  cls.__object = true
-  cls.__instance = false
-  cls.__name = name
-  cls.__inherits = inherits
-  cls.__index = inherits
+  if parent then
+    class.set(cls, '__class', parent)
 
-  if inherits then
-    for key, _ in pairs(inherits.__attributes) do
-      cls.__attributes[key] = true
+    for key, value in pairs(parent) do
+      if not skip[key] then
+        class.set(cls, key, value)
+      end
     end
 
-    for key, _ in pairs(inherits.__methods) do
-      cls.__methods[key] = true
-    end
-
-    for key, _ in pairs(inherits.__metaattributes) do
-      cls.__metaattributes[key] = true
-    end
-
-    for key, _ in pairs(inherits.__metamethods) do
-      cls.__metamethods[key] = true
-    end
+    copy_attribs('__attributes', cls, parent)
+    copy_attribs('__methods', cls, parent)
+    copy_attribs('__metaattributes', cls, parent)
+    copy_attribs('__metamethods', cls, parent)
   end
 
-  function cls:new(...)
-    return class.create_instance(cls, defaults, ...)
+  class.set(cls, '__name', name)
+  class.set(cls, '__type', 'class')
+  class.set(cls, '__call', class.make_instance)
+
+  if not cls.__index then
+    cls.__index = rawget
   end
 
-  cls.__call = cls.new
-
-  if defaults then
-    for key, value in pairs(defaults) do
-      class.set(cls, key, value)
-    end
+  if not cls.__newindex then
+    cls.__newindex = class.set
   end
 
-  setmetatable(cls, cls)
-
-  cls.inherits = class.inherits
-  cls.isa = cls.inherits
-  cls.is_parent_of = class.is_parent_of
-  cls.is_child_of = class.is_child_of
-  cls.get_methods = class.methods
-  cls.get_attributes = class.attributes
-  cls.get_parents = class.get_parents
-
-  function cls.is(obj)
-    return cls:isa(obj)
+  if cls.__class then
+    setmetatable(cls, cls.__class)
+  else
+    setmetatable(cls, cls)
   end
 
   return cls
 end
 
-class.class = class.get_class
-class.isa = class.inherits
-class.parents = class.get_parents
-
-function class:import()
-  _G.class = self
+---@param name string
+---@param parent? class
+---@param defaults? table<string|number,any>
+---@return table
+function class.new(name, parent, defaults)
+  return class(name, parent, defaults)
 end
 
-return class
+---@param name string
+---@param parent class
+---@param defaults? table<string|number,any>
+---@return table
+function class:__call(name, parent, defaults)
+  return class.make_class(name, parent, defaults)
+end
+
+
+-- ---@class X : X.class : instance
+-- ---@class Y : Y.class : instance
+--
+-- ---@class X.class : class
+-- ---@field a number
+-- ---@field b number
+-- ---@overload fun(...): X
+-- local X = class 'X'
+--
+-- X.a = 1
+-- X.b = 2
+--
+-- function X:print()
+-- end
+--
+-- ---@class Y.class : X.class
+-- ---@field c number
+-- ---@overload fun(...): Y
+-- local Y = class('Y', X)
+-- local y = Y()
+-- y:print()
+--
+defclass = class.new

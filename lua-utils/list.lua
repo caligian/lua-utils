@@ -479,8 +479,8 @@ end
 function list.index(x, value, opts)
   opts = opts or {}
   local times = undefined(opts.times, 1)
-  local once = ifelse(times == 1, true, opts.once)
-  once = ifelse(times > 1, false, once)
+  local once = times == 1 and true or opts.once
+  once = times > 1 and false or once
   local res = {}
   local ind = 1
   local cmp = opts.cmp or opts.compare or function(a, b)
@@ -1228,7 +1228,7 @@ function list.pick(x, bool_x, invert)
 
   for i = 1, len_x do
     local ok = bool_x[i]
-    ok = ifelse(invert, not ok, ok)
+    ok = invert and not ok or ok
     if ok then
       res[res_i] = x[i]
       res_i = res_i + 1
@@ -1246,7 +1246,23 @@ function list.test(x, f)
 
   for i = 1, #x do
     local v = x[i]
-    res[i] = ifelse(f(v), true, false)
+    res[i] = f(v) and true or false
+  end
+
+  return res
+end
+
+---@param xs any[]
+---@return any[]
+function list.unique(xs)
+  lookup = {}
+  for i = 1, #xs do
+    lookup[xs[i]] = true
+  end
+
+  res = {}
+  for key, _ in pairs(lookup) do
+    res[#res + 1] = key
   end
 
   return res

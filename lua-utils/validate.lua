@@ -1,14 +1,17 @@
-require 'lua-utils.dump'
+require 'lua-utils.utils'
 
-local list = require 'lua-utils.list'
-local dict = require('lua-utils.dict')
-local types = require('lua-utils.types')
-local is = require 'lua-utils.is'
-local union = types.union
+---@alias validate.valid_type guard.valid_type
 
----@overload fun(specs: table<string,table<any,any>>): nil
-local validate = {}
-setmetatable(validate, validate)
+---@class validate.pair
+---@field [1] validate.valid_type
+---@field [2]? any
+---@field type? validate.valid_type
+---@field value? any
+
+---@alias validate.spec table<string,validate.pair>
+
+---@type table
+local validate = defmodule('validate')
 
 ---@param key string
 ---@param prefix? string
@@ -33,72 +36,78 @@ local function is_opt_key(key, prefix)
 end
 
 local function throw(prefix, msg)
-  errorf(prefix .. ': ' .. msg)
+  errorf('%s: %s', prefix, msg)
 end
 
 ---@param x any
----@param y any
----@param prefix? string (default: <root>)
----@return boolean?
-local function check(x, y, prefix)
-  prefix = prefix or '<root>'
-  if is.pure_table(x) and is.pure_table(y) then
-    dict.each(y, function(y_key, y_value)
-      local is_opt
-      is_opt, y_key = is_opt_key(y_key, prefix)
-      local x_value = x[y_key]
-      local prefix_key = y_key
+local function should_recurse(x, prefix)
+  if not is_pure_table(x) then
+    throw(prefix, sprintf('Expected pure_table, got [%s] %s', type(x), x))
+  end
+end
 
-      if is.number(y_key) then
-        prefix_key = sprintf('[%d]', y_key)
-        prefix_key = prefix .. prefix_key
-      else
-        prefix_key = prefix .. '.' .. y_key
+---@param opt boolean
+---@param key string
+---@param value any
+---@param spec validate.valid_type
+---@param prefix? string
+local function check(opt, key, value, spec, prefix)
+  if is_pure_table(spec) then
+    should_recurse(value, prefix)
+
+    for spec_key, spec_value in pairs(spec) do
+      ::next::
+      spec_opt, spec_key = is_opt_key(spec_key)
+      local v = value[spec_key]
+
+      if v == nil and spec_opt then
+        goto next
       end
 
-      if is_opt and undefined(x_value) then
-        return
+      if type(spec_key) == 'number' then
+        check(
+          spec_opt, spec_key, v, spec_value,
+          prefix .. '[' .. tostring(spec_key) .. ']'
+        )
       else
-        check(x_value, y_value, prefix_key)
+        check(
+          spec_opt, spec_key, v, spec_value,
+          prefix .. '.' .. key
+        )
       end
-    end)
-  elseif callable(y) and not is.object(y) then
-    local ok, msg = y(x)
-    if not ok then
-      msg = msg or sprintf('%s: Assertion failure', y)
-      throw(prefix, msg)
     end
+  elseif opt and value == nil then
+    return true, nil
   else
-    local ok, msg = types.is(x, y)
-    if not ok then
-      throw(prefix, msg)
-    end
+    local ok, msg = is(value, spec, { prefix = prefix, assert = true })
+    if not ok then error(msg) end
   end
 end
 
 function validate:__call(specs)
-  dict.each(specs, function (key, spec)
-    local validator, obj = spec[1], spec[2]
+  for key, spec in pairs(specs) do
+    local validator, obj = spec[1] or spec.type, spec[2] or spec.value
     local is_opt
     is_opt, key = is_opt_key(key)
 
     if is_opt and obj == nil then
       return true
     else
-      check(obj, validator, key)
+      check(is_opt, key, obj, validator, key)
     end
-  end)
+  end
+
+  return true
 end
 
 function validate:__index(name)
   return function(obj, validator)
-    validate { [name] = { validator, obj } }
+    validate { [name] = { type = validator, value = obj } }
   end
 end
 
-function validate:import()
-  _G.validate = self
-  _G.arguments = self
-end
+-- validate {
+--   display = {type = {{'number'}}, value = {{'a'}}}
+-- }
 
 return validate
